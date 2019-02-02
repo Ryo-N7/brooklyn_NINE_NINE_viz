@@ -1,0 +1,292 @@
+---
+title: "Untitled"
+author: "RN7"
+date: "February 2, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+- hey there criminal, it's me johnny law!
+- Terry loves `ggplot2`!
+- yippie-kayak other buckets!
+- Noice. Toit.
+
+
+# Packages
+
+```{r}
+pacman::p_load(tidyverse, rvest, glue, cowplot,
+               polite, extrafont, scales, gridExtra)
+```
+
+
+# Episode ratings
+
+```{r}
+# Calling `as_tibble()` on a vector is discouraged, because the behavior is likely to change in the future. Use `enframe(name = NULL)` instead.
+
+
+url_df <- tibble(
+  urls = c("https://www.imdb.com/title/tt2467372/episodes?season=1",
+           "https://www.imdb.com/title/tt2467372/episodes?season=2",
+           "https://www.imdb.com/title/tt2467372/episodes?season=3",
+           "https://www.imdb.com/title/tt2467372/episodes?season=4",
+           "https://www.imdb.com/title/tt2467372/episodes?season=5"),
+  season_num = c(1, 2, 3, 4, 5))
+
+# scraping function:
+brooklyn99_ep_rating <- function(url) {
+  
+  session <- bow(url)
+  url2 <- scrape(session)
+  
+  # Grab episode names
+  sX_ep_name <- url2 %>% 
+    html_nodes(".info a") %>% 
+    html_text() %>% 
+    enframe(name = value) %>% 
+    mutate(value = gsub("\\n", "", x = value))
+  # Grab episode rating
+  sX_rate <- url2 %>% 
+    html_nodes(".ipl-rating-widget > .ipl-rating-star .ipl-rating-star__rating") %>% 
+    html_text() %>% 
+    enframe(name = value) %>% 
+    mutate(value = gsub("\\n", "", x = value) %>% as.numeric)
+  
+  # Clean episode name df
+  sX_ep_name <- sX_ep_name %>% 
+    mutate(title = trimws(value)) %>% 
+    filter(!str_detect(title, "Rate"), title != "") %>% 
+    select(-value)
+  
+  # combine name + rating
+  ep_rating <- sX_ep_name %>% 
+    bind_cols(sX_rate)
+}
+
+brooklyn99_ep_rating_df <- map2(.x = url_df$urls, .y = url_df$season_num,
+                          ~ brooklyn99_ep_rating(url = .x) %>% 
+         mutate(season = .y)) %>% 
+  reduce(rbind)
+
+#saveRDS(brooklyn99_ep_rating_df, "../data/brooklyn99_ep_rating_df.RDS")
+readRDS("../data/brooklyn99_ep_rating_df.RDS")
+```
+
+
+
+# Cast appearances
+
+
+```{r}
+cast_url <- bow("https://www.imdb.com/title/tt2467372/fullcredits?ref_=tt_cl_sm#cast")
+
+cast_info_raw <- scrape(cast_url) %>% 
+  html_nodes(".character") %>% 
+  html_text() %>% 
+  as_tibble()
+
+cast_info_clean <- cast_info_raw %>% 
+  separate(value, into = c("blank", "name", "episode_num", "dots"), sep = "\n") %>% 
+  mutate(episode_num = case_when(
+    episode_num == "         / ...  " ~ dots,
+    TRUE ~ episode_num),
+    episode_num = episode_num %>% word(., 1, sep = "e") %>% as.numeric,
+    name = str_trim(name, side = "both")) %>% 
+  select(-blank, -dots)
+  
+# MAIN cast
+cast_main_url <- bow("https://en.wikipedia.org/wiki/List_of_Brooklyn_Nine-Nine_characters")
+
+cast_main_raw <- scrape(cast_main_url) %>% 
+  html_nodes(".wikitable") %>% 
+  html_table(fill = TRUE) %>% 
+  flatten_df() %>% 
+  as_tibble()
+
+cast_main_clean <- cast_main_raw %>% 
+  slice(-1) %>% 
+  select(Character)
+
+# save
+#saveRDS(cast_info_clean, "../data/cast_info_clean.RDS")
+readRDS("../data/cast_info_clean.RDS")
+
+#saveRDS(cast_main_clean, "../data/cast_main_clean.RDS")
+readRDS("../data/cast_main_clean.RDS")
+
+# anti-join
+non_main_cast <- anti_join(cast_info_clean, cast_main_clean, by = c("name" = "Character"))
+```
+
+
+
+
+# Viewer numbers
+
+```{r}
+viewer_url <- bow("https://en.wikipedia.org/wiki/List_of_Brooklyn_Nine-Nine_episodes")
+
+# .wikiepisodetable tr :nth-child(8)
+# .vevent td , .wikiepisodetable th
+# .wikiepisodetable th , .vevent td
+
+viewer_raw <- scrape(viewer_url) %>% 
+  html_nodes(".wikiepisodetable") %>% 
+  #html_text()
+  html_table(fill = TRUE)
+
+
+dat <- tibble(season_num = c(1, 2, 3, 4, 5, 6))
+
+# viewers are in MILLIONS
+viewers_df <- viewer_raw %>% 
+  map(~mutate(., dat$season_num))
+#
+  reduce(rbind) %>% 
+    #
+    #
+  as_tibble(.name_repair = "unique") %>% 
+  select(-season, season_num = season_2, contains("episode")) %>% 
+  gather(key = "episode_number", value = "viewers", -season_num) %>% 
+  mutate(episode_number = str_extract(episode_number, "[0-9]+") %>% as.numeric) %>% 
+  mutate(episode_number = case_when(
+    is.na(episode_number) ~ 1,
+    TRUE ~ episode_number
+  )) %>% 
+  filter(viewers != "N/A") %>% 
+  arrange(season_num) %>% 
+  mutate(total_episode_count = row_number(),
+         viewers = viewers %>% as.numeric,
+         season_num = as.factor(season_num)) %>% 
+  # what overal episode number does each season start/end on?
+  group_by(season_num) %>% 
+  mutate(first = first(total_episode_count), 
+         last = last(total_episode_count))
+
+# save:
+saveRDS(viewers_df, "../data/viewers_df.RDS")
+readRDS("../data/viewers_df.RDS")
+```
+
+
+# colors & fonts
+
+
+```{r}
+# yellow: #FCF40E
+# dark grey: #3A3533
+# light teal: #6CA9C3
+# black: #0F0E0E
+# navy: #175E78
+# title navy: #000E33
+# grey: #CBCFD2
+# white: #F9FEFF
+# blue: #0053CD
+```
+
+```{r message=FALSE}
+#loadfonts(device = "win")
+
+ggplot(mtcars, aes(x = mpg, y = vs)) +
+  geom_point(size = 2.5) +
+  ggtitle("Brooklyn\nNine-Nine") +
+  theme_minimal() +
+  theme(title = element_text(family = "Univers LT 93 ExtraBlackEx",
+                            color = "#F9FEFF"),
+        axis.title = element_text(color = "#F9FEFF", family = "Roboto Condensed",
+                                  size = 15, face = "bold"),
+        axis.text = element_text(color = "#F9FEFF", family = "Roboto Condensed",
+                                 size = 12),
+        plot.background = element_rect(fill = "#0053CD")) +
+  annotate(geom = "text", x = 25, y = 0.5, size = 10,
+           color = "#000E33",
+           label = "Brooklyn\nNine-Nine", family = "Univers") +
+  annotate(geom = "point", x = 20, y = 0.75, 
+           color = "#FCF40E", fill = "#FCF40E", size = 3.5) +
+  annotate(geom = "point", x = 15, y = 0.75, 
+           color = "red", size = 3.5) +
+  annotate(geom = "point", x = 10, y = 0.75, 
+           color = "#3A3533", size = 3.5) +
+  annotate(geom = "point", x = 22.5, y = 0.75, 
+           color = "#CBCFD2", size = 3.5) +
+  annotate(geom = "point", x = 17.5, y = 0.75, 
+           color = "orange", size = 3.5) +
+  annotate(geom = "point", x = 12.5, y = 0.75, 
+           color = "#0F0E0E", size = 3.5) +
+  annotate(geom = "point", x = 25, y = 0.75, 
+           color = "brown", size = 3.5)
+
+```
+
+
+# text boxes etc.
+
+```{r}
+
+```
+
+```{r fig.width = 12, fig.height = 6}
+#library(shadowtext)
+
+rect <- data.frame(id = c(1, 1, 1, 1),
+                   x = c(12, 12, 0,  0),
+                   y = c(6, 3, 1,  4))
+
+rect2 <- data.frame(id = c(1, 1, 1, 1),
+                   x = c(12, 12, 6,  5.8),
+                   y = c(2.5, 1.25, 0,  1.5))
+
+header <- ggplot() +
+  geom_polygon(data = rect, aes(x, y, group = id), fill = "#0053CD") +
+  geom_polygon(data = rect2, aes(x, y, group = id), fill = "#000E33") +
+  # annotate(geom = "text", y = 3, x = 1.5, hjust = 0,
+  #          family = "Univers LT 93 ExtraBlackEx", 
+  #          color = "#fcf7e8", size = 25, angle = 3.5,
+  #          label = glue("
+  #                       Brooklyn
+  #                           Nine-Nine")) +
+  annotate(geom = "text", y = 3, x = 2.5, hjust = 0,
+           family = "Univers LT 93 ExtraBlackEx", 
+           color = "#fcf7e8", size = 35, angle = 6.5,
+           label = glue("
+                        Brooklyn")) +
+  annotate(geom = "text", y = 1, x = 5.5, hjust = 0,
+           family = "Univers", 
+           color = "#fcf7e8", size = 25, angle = 4.5,
+           label = glue("
+                        Nine-Nine")) +
+  # geom_rect(aes(xmin = 1, xmax = 12,
+  #               ymin = 3, ymax = 10))
+  # annotate(geom = "polygon", fill = "red",
+  #          x = c(0, 0, 12, 12),
+  #          y = c(1, 3, 8, 10)) +
+  # annotate(geom = "text", y = 3, x = 2, hjust = 0,
+  #          family = "Univers LT 93 ExtraBlackEx", 
+  #          color = "#fcf7e8", size = 15, angle = 2.5,
+  #          label = glue("Brooklyn Nine-Nine")) +
+  # xlim(0, 12) +
+  # ylim(0, 6) +
+  scale_x_continuous(expand = c(0, 0), limits = c(0, 12)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 6)) +
+  theme_void() +
+  theme(plot.background = element_rect(color = "#F9FEFF", 
+                                       fill = "#F9FEFF", # "#1A5E1FFF" "#CCFFBB"
+                                       size = 8))
+
+header
+```
+
+
+
+# composition
+
+```{r}
+?cowplot::plot_grid()
+grid::textGrob()
+grid::circleGrob()
+```
+
