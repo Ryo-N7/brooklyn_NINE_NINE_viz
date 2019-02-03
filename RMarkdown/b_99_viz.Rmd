@@ -35,7 +35,7 @@ url_df <- tibble(
            "https://www.imdb.com/title/tt2467372/episodes?season=3",
            "https://www.imdb.com/title/tt2467372/episodes?season=4",
            "https://www.imdb.com/title/tt2467372/episodes?season=5"),
-  season_num = c(1, 2, 3, 4, 5))
+  season_num = c(1, 2, 3, 4, 5)) 
 
 # scraping function:
 brooklyn99_ep_rating <- function(url) {
@@ -73,9 +73,48 @@ brooklyn99_ep_rating_df <- map2(.x = url_df$urls, .y = url_df$season_num,
   reduce(rbind)
 
 #saveRDS(brooklyn99_ep_rating_df, "../data/brooklyn99_ep_rating_df.RDS")
-readRDS("../data/brooklyn99_ep_rating_df.RDS")
+ep_rating_df <- readRDS("../data/brooklyn99_ep_rating_df.RDS")
 ```
 
+## ratings plot
+
+```{r}
+rating_plot <- ep_rating_df %>% 
+  group_by(season) %>% 
+  mutate(ep_num = row_number()) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = ep_num, y = season)) +
+  geom_tile(aes(fill = value), size = 1.5,
+            color = "black") +
+  scale_fill_gradient(low = "#E6FFFF", high = "#0040FF", 
+                       name = "Rating") +
+  guides(fill = guide_colourbar(frame.colour = "black")) +
+  scale_x_continuous(expand = c(0, 0), 
+                     breaks = c(1, seq(from = 5, to = 20, by = 5), 24),
+                     labels = c(1, seq(from = 5, to = 20, by = 5), 24)) +
+  scale_y_reverse(expand = c(0, 0),
+                  breaks = c(1:7), 
+                  labels = c(1:7)) +
+  labs(x = "Episode Number", y = "Season",
+       title = "Brooklyn Nine-Nine") +
+  theme_minimal() +
+  theme(text = element_text(family = "Univers", color = "white"),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(family = "Univers", color = "white", size = 10),
+        legend.title = element_text(family = "Univers", color = "black"),
+        legend.text = element_text(family = "Univers", color = "black"),
+        legend.position = "bottom",
+        legend.key = element_rect(colour = "black", linetype = "solid"),
+        legend.background = element_rect(color = "black", fill = "#CBCFD2",
+                                         linetype = "solid"),
+        plot.title = element_text(family = "Univers LT 93 ExtraBlackEx",
+                                  color = "white"),
+        panel.grid = element_blank(),
+        plot.background = element_rect(color = NA, fill = "#0053CD"),
+        panel.background = element_rect(color = NA, fill = "#0053CD"))
+
+rating_plot
+```
 
 
 # Cast appearances
@@ -96,7 +135,13 @@ cast_info_clean <- cast_info_raw %>%
     TRUE ~ episode_num),
     episode_num = episode_num %>% word(., 1, sep = "e") %>% as.numeric,
     name = str_trim(name, side = "both")) %>% 
-  select(-blank, -dots)
+  select(-blank, -dots) %>% 
+  mutate(name = case_when(
+    name == "Captain Ray Holt" ~ "Ray Holt",
+    name == "Scully" ~ "Norm Scully",
+    name == "Hitchcock" ~ "Michael Hitchcock",
+    TRUE ~ name
+  ))
   
 # MAIN cast
 cast_main_url <- bow("https://en.wikipedia.org/wiki/List_of_Brooklyn_Nine-Nine_characters")
@@ -113,14 +158,73 @@ cast_main_clean <- cast_main_raw %>%
 
 # save
 #saveRDS(cast_info_clean, "../data/cast_info_clean.RDS")
-readRDS("../data/cast_info_clean.RDS")
+cast_info_clean <- readRDS("../data/cast_info_clean.RDS")
 
 #saveRDS(cast_main_clean, "../data/cast_main_clean.RDS")
-readRDS("../data/cast_main_clean.RDS")
+cast_main_clean <- readRDS("../data/cast_main_clean.RDS")
 
 # anti-join
 non_main_cast <- anti_join(cast_info_clean, cast_main_clean, by = c("name" = "Character"))
 ```
+
+## cast plot
+
+```{r}
+# http://id.fnshr.info/2017/03/13/r-plot-tategaki/
+tategaki <- function(x){
+  x <- chartr("ー", "丨", x) # 長音符の処理
+  x <- strsplit(split="", x)
+  sapply(x, paste, collapse="\n")
+}
+
+tategaki_alt <- function(x){
+  x <- stringr::str_replace_all(x, "ー", "丨") # 長音符の処理
+  stringr::str_wrap(x, width = 1)
+}
+```
+
+
+```{r}
+non_main_plot <- non_main_cast %>% 
+  arrange(desc(episode_num)) %>% 
+  head(5) %>% 
+  mutate(halfway = episode_num / 2) %>% 
+  ggplot(aes(x = reorder(name, desc(episode_num)), y = episode_num)) +
+  geom_col(fill = "#3A3533") +
+  geom_text(aes(y = halfway, label = episode_num,
+                family = "Univers"),
+            color = "#F9FEFF",
+            size = 8) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 12.5),
+                     breaks = c(2, 4, 6, 8, 10, 12),
+                     labels = c(2, 4, 6, 8, 10, 12)) +
+  labs(title = "Most appearances by non-main cast", 
+       x = NULL, y = tategaki("Number of Episodes")) +
+  theme_minimal() +
+  theme(text = element_text(family = "Univers", color = "#F9FEFF"),
+        axis.text = element_text(size = 8, color = "#F9FEFF"),
+        axis.title.y = element_text(angle = 0, vjust= 0.5),
+        plot.background = element_rect(color = NA, fill = "#0053CD"),
+        panel.background = element_rect(color = NA, fill = "#0053CD"),
+        panel.grid.major.x = element_blank())
+
+# images
+pimage <- axis_canvas(non_main_plot, axis = 'x') + 
+  draw_image("https://vignette.wikia.nocookie.net/tvdatabase/images/d/d5/Adrian_Pimento.jpg", 
+             x = 0.5, scale = 0.9) +
+  draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/a/ab/Kevin.jpg", 
+             x = 1.5, scale = 0.9) +
+  draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/b/b3/Wuntch.png", 
+             x = 2.5, scale = 0.9) +
+  draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/2/23/Vulture.jpg", 
+             x = 3.5, scale = 0.9) +
+  draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/0/0a/Doug_Judy.png",
+             x = 4.5, scale = 0.9)
+
+# insert the image strip into the bar plot and draw  
+ggdraw(insert_xaxis_grob(non_main_plot, pimage, position = "bottom"))
+```
+
 
 
 
@@ -128,53 +232,151 @@ non_main_cast <- anti_join(cast_info_clean, cast_main_clean, by = c("name" = "Ch
 # Viewer numbers
 
 ```{r}
-viewer_url <- bow("https://en.wikipedia.org/wiki/List_of_Brooklyn_Nine-Nine_episodes")
+# viewer_url <- bow("https://en.wikipedia.org/wiki/List_of_Brooklyn_Nine-Nine_episodes")
 
 # .wikiepisodetable tr :nth-child(8)
 # .vevent td , .wikiepisodetable th
 # .wikiepisodetable th , .vevent td
 
-viewer_raw <- scrape(viewer_url) %>% 
-  html_nodes(".wikiepisodetable") %>% 
-  #html_text()
-  html_table(fill = TRUE)
+
+url_wiki_df <- tibble(
+  urls = c("https://en.wikipedia.org/wiki/Brooklyn_Nine-Nine_(season_1)",
+           "https://en.wikipedia.org/wiki/Brooklyn_Nine-Nine_(season_2)",
+           "https://en.wikipedia.org/wiki/Brooklyn_Nine-Nine_(season_3)",
+           "https://en.wikipedia.org/wiki/Brooklyn_Nine-Nine_(season_4)",
+           "https://en.wikipedia.org/wiki/Brooklyn_Nine-Nine_(season_5)"),
+  season_num = c(1, 2, 3, 4, 5))
 
 
-dat <- tibble(season_num = c(1, 2, 3, 4, 5, 6))
+# session <- bow("https://en.wikipedia.org/wiki/Brooklyn_Nine-Nine_(season_1)")
+# 
+# episode_raw <- scrape(session) %>% 
+#   html_nodes(".wikiepisodetable") %>% 
+#   html_table(fill = TRUE) %>% 
+#   flatten_df() %>% 
+#   as_tibble() %>% 
+#   filter(row_number() %% 2 != 0)
+#   
+# episode_tab <- episode_raw %>% 
+#   set_names(c("num_overall", "num_season", "title", "director", "writer",
+#               "air_date", "prod_code", "viewers")) %>% 
+#   mutate(viewers = str_remove_all(viewers, "\\[[0-9]+\\]") %>% as.numeric)
 
-# viewers are in MILLIONS
-viewers_df <- viewer_raw %>% 
-  map(~mutate(., dat$season_num))
-#
-  reduce(rbind) %>% 
-    #
-    #
-  as_tibble(.name_repair = "unique") %>% 
-  select(-season, season_num = season_2, contains("episode")) %>% 
-  gather(key = "episode_number", value = "viewers", -season_num) %>% 
-  mutate(episode_number = str_extract(episode_number, "[0-9]+") %>% as.numeric) %>% 
-  mutate(episode_number = case_when(
-    is.na(episode_number) ~ 1,
-    TRUE ~ episode_number
-  )) %>% 
-  filter(viewers != "N/A") %>% 
-  arrange(season_num) %>% 
-  mutate(total_episode_count = row_number(),
-         viewers = viewers %>% as.numeric,
-         season_num = as.factor(season_num)) %>% 
-  # what overal episode number does each season start/end on?
-  group_by(season_num) %>% 
-  mutate(first = first(total_episode_count), 
-         last = last(total_episode_count))
 
-# save:
-saveRDS(viewers_df, "../data/viewers_df.RDS")
-readRDS("../data/viewers_df.RDS")
+brooklyn99_ep_info <- function(url) {
+  
+  session <- bow(url)
+  
+  episode_raw <- scrape(session) %>% 
+    html_nodes(".wikiepisodetable") %>% 
+    html_table(fill = TRUE) %>% 
+    flatten_df() %>% 
+    as_tibble() %>% 
+    filter(row_number() %% 2 != 0)
+  
+  episode_table <- episode_raw %>% 
+  set_names(c("num_overall", "num_season", "title", "director", "writer",
+              "air_date", "prod_code", "viewers")) %>% 
+  mutate(viewers = str_remove_all(viewers, "\\[[0-9]+\\]") %>% as.numeric)
+  
+}
+
+brooklyn99_ep_info_df <- map2(.x = url_wiki_df$urls, .y = url_wiki_df$season_num,
+                          ~ brooklyn99_ep_info(url = .x) %>% 
+         mutate(season = .y)) %>% 
+  reduce(rbind)
+
+saveRDS(brooklyn99_ep_info_df, "../data/brooklyn99_ep_info_df.RDS")
+brooklyn_ep_info_df <- readRDS("../data/brooklyn99_ep_info_df.RDS")
+brooklyn99_ep_info_df %>% glimpse()
+```
+
+- use `separate_rows()` for writers and directors?
+
+
+```{r}
+brooklyn99_ep_info_df %>% 
+  select(season, num_season, title, num_overall, writer, viewers) %>% 
+  separate_rows(writer, sep = "&") %>% 
+  mutate(writer = writer %>% trimws) %>% 
+  #select(writer) %>% unique() %>% 
+  group_by(writer) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n))
+  #add_count(writer)
+```
+
+```{r}
+brooklyn99_ep_info_df %>% 
+  select(season, num_season, title, num_overall, director, viewers) %>% 
+  separate_rows(director, sep = "&") %>% 
+  mutate(director = director %>% trimws) %>% 
+  group_by(director) %>% 
+  summarize(n = n(),
+            avg_viewers = mean(viewers)) %>% 
+  arrange(desc(avg_viewers))
+```
+
+
+## viewers plot
+
+- The Fugitive episodes are formatted differently... WHYYYY.gif
+- there are other multi-part episodes but this is the only one that aired on the same day on New Years Day 2017
+
+```{r}
+viewers_df <- brooklyn99_ep_info_df %>% 
+  select(season, num_season, title, num_overall, viewers) %>% 
+  # manually fix The Fugitive episodes
+  filter(num_overall != 7980) %>% 
+  add_row(season = 4, num_season = 11, title = "The Fugitive: Part 1", 
+          num_overall = 79, viewers = 3.49) %>% 
+  add_row(season = 4, num_season = 12, title = "The Fugitive: Part 2", 
+          num_overall = 80, viewers = 3.49) %>% 
+  mutate(num_overall = as.numeric(num_overall),
+         num_season = as_factor(num_season),
+         season = as_factor(as.character(season))) %>% 
+  arrange(num_overall) %>% 
+  group_by(season) %>% 
+  mutate(first = first(num_overall),
+         last = last(num_overall)) %>% 
+  ungroup() 
+
+cols <- c("#FCF40E", "#3A3533", "#6CA9C3", "#0F0E0E", "#175E78")
+# yellow: #FCF40E
+# dark grey: #3A3533
+# light teal: #6CA9C3
+# black: #0F0E0E
+# navy: #175E78
+
+viewer_plot <- viewers_df %>% 
+  ggplot(aes(x = num_overall, y = viewers, group = 1)) +
+  geom_rect(aes(xmin = first, xmax = last,
+                fill = season), alpha = 0.2,
+            ymin = -Inf, ymax = Inf) +
+  geom_line(color = "white") +
+  scale_fill_manual(values = cols) +
+  scale_y_continuous(limits = c(0, 20)) +
+  scale_x_continuous(breaks = c(seq(0, 120, by = 5)),
+                     labels = c(seq(0, 120, by = 5))) +
+  labs(x = "Episode Number (Overall)", y = "Viewers (Millions)",
+       title = "Viewers by Episode") +
+  theme_minimal() +
+  theme(text = element_text(family = "Univers", color = "#F9FEFF"),
+        axis.text = element_text(size = 8, color = "#F9FEFF"),
+        plot.background = element_rect(color = NA, fill = "#0053CD"), 
+        panel.background = element_rect(color = NA, fill = "#0053CD"),
+        panel.grid = element_blank(),
+        legend.position = "bottom") +
+  annotate(geom = "text", x = 20, y = 15, label = "Aired after Super Bowl!")
+
+viewer_plot
 ```
 
 
 # colors & fonts
 
+- dichromat: lightbluetodarkblue.10
+-RColorBrewer: Blues
 
 ```{r}
 # yellow: #FCF40E
@@ -186,6 +388,8 @@ readRDS("../data/viewers_df.RDS")
 # grey: #CBCFD2
 # white: #F9FEFF
 # blue: #0053CD
+
+
 ```
 
 ```{r message=FALSE}
