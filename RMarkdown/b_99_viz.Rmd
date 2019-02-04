@@ -76,6 +76,14 @@ brooklyn99_ep_rating_df <- map2(.x = url_df$urls, .y = url_df$season_num,
 ep_rating_df <- readRDS("../data/brooklyn99_ep_rating_df.RDS")
 ```
 
+```{r}
+ep_rating_df %>% 
+  arrange(desc(value)) %>% 
+  head(10)
+```
+
+
+
 ## ratings plot
 
 ```{r}
@@ -86,28 +94,33 @@ rating_plot <- ep_rating_df %>%
   ggplot(aes(x = ep_num, y = season)) +
   geom_tile(aes(fill = value), size = 1.5,
             color = "black") +
-  scale_fill_gradient(low = "#E6FFFF", high = "#0040FF", 
-                       name = "Rating") +
+  # scale_fill_gradient(low = "#c6dbef", high = "#0040FF", # low = "#E6FFFF", high = "#0040FF"
+  #                      name = "Rating") +
+  scale_fill_gradientn(colors = dichromat::colorschemes$LightBluetoDarkBlue.10) +
   guides(fill = guide_colourbar(frame.colour = "black")) +
-  scale_x_continuous(expand = c(0, 0), 
-                     breaks = c(1, seq(from = 5, to = 20, by = 5), 24),
-                     labels = c(1, seq(from = 5, to = 20, by = 5), 24)) +
-  scale_y_reverse(expand = c(0, 0),
+  scale_x_continuous(expand = c(0.01, 0.01), 
+                     breaks = c(1, seq(from = 5, to = 20, by = 5), 23),
+                     labels = c(1, seq(from = 5, to = 20, by = 5), 23)) +
+  scale_y_reverse(expand = c(0.01, 0.01),
                   breaks = c(1:7), 
                   labels = c(1:7)) +
   labs(x = "Episode Number", y = "Season",
-       title = "Brooklyn Nine-Nine") +
+       title = "Brooklyn Nine-Nine",
+       caption = glue("
+                      Source: IMDB
+                      @R_By_Ryo")) +
   theme_minimal() +
   theme(text = element_text(family = "Univers", color = "white"),
-        axis.title = element_text(size = 12),
-        axis.text = element_text(family = "Univers", color = "white", size = 10),
-        legend.title = element_text(family = "Univers", color = "black"),
-        legend.text = element_text(family = "Univers", color = "black"),
+        axis.title = element_text(size = 14),
+        axis.text = element_text(family = "Univers", color = "white", size = 12),
+        legend.title = element_text(family = "Univers", color = "white"),
+        legend.text = element_text(family = "Univers", color = "white"),
         legend.position = "bottom",
-        legend.key = element_rect(colour = "black", linetype = "solid"),
-        legend.background = element_rect(color = "black", fill = "#CBCFD2",
+        legend.key = element_rect(colour = "black", linetype = "solid", size = 1.5),
+        legend.background = element_rect(color = "black", fill = "#0053CD",
                                          linetype = "solid"),
         plot.title = element_text(family = "Univers LT 93 ExtraBlackEx",
+                                  size = 20,
                                   color = "white"),
         panel.grid = element_blank(),
         plot.background = element_rect(color = NA, fill = "#0053CD"),
@@ -287,8 +300,8 @@ brooklyn99_ep_info_df <- map2(.x = url_wiki_df$urls, .y = url_wiki_df$season_num
   reduce(rbind)
 
 saveRDS(brooklyn99_ep_info_df, "../data/brooklyn99_ep_info_df.RDS")
-brooklyn_ep_info_df <- readRDS("../data/brooklyn99_ep_info_df.RDS")
-brooklyn99_ep_info_df %>% glimpse()
+b99_ep_info_df <- readRDS("../data/brooklyn99_ep_info_df.RDS")
+b99_ep_info_df %>% glimpse()
 ```
 
 - use `separate_rows()` for writers and directors?
@@ -324,7 +337,7 @@ brooklyn99_ep_info_df %>%
 - there are other multi-part episodes but this is the only one that aired on the same day on New Years Day 2017
 
 ```{r}
-viewers_df <- brooklyn99_ep_info_df %>% 
+viewers_df <- b99_ep_info_df %>% 
   select(season, num_season, title, num_overall, viewers) %>% 
   # manually fix The Fugitive episodes
   filter(num_overall != 7980) %>% 
@@ -333,7 +346,7 @@ viewers_df <- brooklyn99_ep_info_df %>%
   add_row(season = 4, num_season = 12, title = "The Fugitive: Part 2", 
           num_overall = 80, viewers = 3.49) %>% 
   mutate(num_overall = as.numeric(num_overall),
-         num_season = as_factor(num_season),
+         num_season = as.numeric(num_season),
          season = as_factor(as.character(season))) %>% 
   arrange(num_overall) %>% 
   group_by(season) %>% 
@@ -341,7 +354,7 @@ viewers_df <- brooklyn99_ep_info_df %>%
          last = last(num_overall)) %>% 
   ungroup() 
 
-cols <- c("#FCF40E", "#3A3533", "#6CA9C3", "#0F0E0E", "#175E78")
+cols <- c("1" = "#FCF40E", "2" = "#3A3533", "3" = "#6CA9C3", "4" = "#0F0E0E", "5" = "#175E78")
 # yellow: #FCF40E
 # dark grey: #3A3533
 # light teal: #6CA9C3
@@ -349,12 +362,12 @@ cols <- c("#FCF40E", "#3A3533", "#6CA9C3", "#0F0E0E", "#175E78")
 # navy: #175E78
 
 viewer_plot <- viewers_df %>% 
-  ggplot(aes(x = num_overall, y = viewers, group = 1)) +
+  ggplot(aes(x = num_overall, y = viewers, group = season)) +
   geom_rect(aes(xmin = first, xmax = last,
                 fill = season), alpha = 0.2,
             ymin = -Inf, ymax = Inf) +
   geom_line(color = "white") +
-  scale_fill_manual(values = cols) +
+  scale_fill_manual("Season", values = cols, guide = FALSE) +
   scale_y_continuous(limits = c(0, 20)) +
   scale_x_continuous(breaks = c(seq(0, 120, by = 5)),
                      labels = c(seq(0, 120, by = 5))) +
@@ -365,9 +378,8 @@ viewer_plot <- viewers_df %>%
         axis.text = element_text(size = 8, color = "#F9FEFF"),
         plot.background = element_rect(color = NA, fill = "#0053CD"), 
         panel.background = element_rect(color = NA, fill = "#0053CD"),
-        panel.grid = element_blank(),
-        legend.position = "bottom") +
-  annotate(geom = "text", x = 20, y = 15, label = "Aired after Super Bowl!")
+        panel.grid = element_blank()) +
+  annotate(geom = "label", x = 20, y = 17, label = "Aired after Super Bowl!")
 
 viewer_plot
 ```
@@ -433,16 +445,16 @@ ggplot(mtcars, aes(x = mpg, y = vs)) +
 
 ```
 
-```{r fig.width = 12, fig.height = 6}
+```{r fig.width = 12, fig.height = 5.5}
 #library(shadowtext)
 
 rect <- data.frame(id = c(1, 1, 1, 1),
                    x = c(12, 12, 0,  0),
-                   y = c(6, 3, 1,  4))
+                   y = c(5.1, 2, 0.4,  3.5))
 
 rect2 <- data.frame(id = c(1, 1, 1, 1),
-                   x = c(12, 12, 6,  5.8),
-                   y = c(2.5, 1.25, 0,  1.5))
+                   x = c(12, 12, 5.1,  4.9),
+                   y = c(2.3, 0.95, 0,  1.3))
 
 header <- ggplot() +
   geom_polygon(data = rect, aes(x, y, group = id), fill = "#0053CD") +
@@ -453,16 +465,16 @@ header <- ggplot() +
   #          label = glue("
   #                       Brooklyn
   #                           Nine-Nine")) +
-  annotate(geom = "text", y = 3, x = 2.5, hjust = 0,
+  annotate(geom = "text", y = 2, x = 0.4, hjust = 0,
            family = "Univers LT 93 ExtraBlackEx", 
-           color = "#fcf7e8", size = 35, angle = 6.5,
+           color = "#fcf7e8", size = 35, angle = 7.5,
            label = glue("
-                        Brooklyn")) +
-  annotate(geom = "text", y = 1, x = 5.5, hjust = 0,
+                        BROOKLYN")) +
+  annotate(geom = "text", y = 0.7, x = 5.25, hjust = 0,
            family = "Univers", 
-           color = "#fcf7e8", size = 25, angle = 4.5,
+           color = "#fcf7e8", size = 25, angle = 7.5,
            label = glue("
-                        Nine-Nine")) +
+                        NINE-NINE")) +
   # geom_rect(aes(xmin = 1, xmax = 12,
   #               ymin = 3, ymax = 10))
   # annotate(geom = "polygon", fill = "red",
@@ -475,7 +487,7 @@ header <- ggplot() +
   # xlim(0, 12) +
   # ylim(0, 6) +
   scale_x_continuous(expand = c(0, 0), limits = c(0, 12)) +
-  scale_y_continuous(expand = c(0, 0), limits = c(0, 6)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 5.5)) +
   theme_void() +
   theme(plot.background = element_rect(color = "#F9FEFF", 
                                        fill = "#F9FEFF", # "#1A5E1FFF" "#CCFFBB"
