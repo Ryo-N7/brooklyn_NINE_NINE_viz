@@ -20,7 +20,81 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 pacman::p_load(tidyverse, rvest, glue, cowplot,
                polite, extrafont, scales, gridExtra)
+loadfonts()
 ```
+
+# B99 theme
+
+```{r}
+theme_b99 <- function(){
+  
+  theme_minimal() %+replace%
+    theme(text = element_text(family = "Univers", color = "#F9FEFF",
+                              face = "plain", size = 14, 
+                              hjust = 0.5, vjust = 0.5, angle = 0,
+                              lineheight = 0.9, margin = margin(0),
+                              debug = FALSE),
+          plot.title = element_text(family = "Univers LT 93 ExtraBlackEx",
+                                    size = 20, color = "#F9FEFF"),
+          plot.background = element_rect(color = NA, fill = "#0053CD"), 
+          panel.background = element_rect(color = NA, fill = "#0053CD"),
+          # axis options
+          axis.text = element_text(family = "Univers", color = "#F9FEFF", size = 12),
+          axis.title = element_text(size = 14),
+          # legend options (for ratings plot)
+          legend.title = element_text(family = "Univers", color = "#F9FEFF"),
+          legend.text = element_text(family = "Univers", color = "#F9FEFF"),
+          legend.position = "bottom",
+          legend.key = element_rect(colour = "black", linetype = "solid", size = 1.5),
+          legend.background = element_rect(color = "black", fill = "#0053CD",
+                                           linetype = "solid"))
+}
+
+viewers_df %>% 
+  ggplot(aes(x = num_overall, y = viewers)) +
+  geom_point() +
+  labs(title = "blahblahblah", x = "dododod", y = "lalalala") +
+  theme_b99()
+
+
+
+# ratings
+ theme_minimal() +
+  theme(# text = element_text(family = "Univers", color = "#F9FEFF"),
+        # axis.title = element_text(size = 14),
+        # axis.text = element_text(family = "Univers", color = "#F9FEFF", size = 12),
+        # legend.title = element_text(family = "Univers", color = "#F9FEFF"),
+        # legend.text = element_text(family = "Univers", color = "#F9FEFF"),
+        # legend.position = "bottom",
+        # legend.key = element_rect(colour = "black", linetype = "solid", size = 1.5),
+        # legend.background = element_rect(color = "black", fill = "#0053CD",
+        #                                  linetype = "solid"),
+        # plot.title = element_text(family = "Univers LT 93 ExtraBlackEx",
+        #                           size = 20,
+        #                           color = "#F9FEFF"),
+        panel.grid = element_blank()#,
+        # plot.background = element_rect(color = NA, fill = "#0053CD"),
+        # panel.background = element_rect(color = NA, fill = "#0053CD")
+        )
+
+# cast 
+theme_minimal() +
+  theme(#text = element_text(family = "Univers", color = "#F9FEFF"),
+        # axis.text = element_text(size = 12, color = "#F9FEFF"),
+        # plot.background = element_rect(color = NA, fill = "#0053CD"),
+        # panel.background = element_rect(color = NA, fill = "#0053CD"),
+        panel.grid.major.x = element_blank())
+
+# viewers
+theme_minimal() +
+  theme(#text = element_text(family = "Univers", color = "#F9FEFF"),
+        # axis.text = element_text(size = 12, color = "#F9FEFF"),
+        # plot.background = element_rect(color = NA, fill = "#0053CD"), 
+        # panel.background = element_rect(color = NA, fill = "#0053CD"),
+        panel.grid = element_blank())
+
+```
+
 
 
 # Episode ratings
@@ -80,11 +154,79 @@ ep_rating_df <- readRDS("../data/brooklyn99_ep_rating_df.RDS")
 ep_rating_df %>% 
   arrange(desc(value)) %>% 
   head(10)
+
+library(infer)
+
+
+# check variances
+
+ep_rating_df %>% 
+  mutate(season = as_factor(as.character(season))) %>% 
+  filter(season %in% c(1, 5)) -> ep_rating_short
+
+car::leveneTest(value ~ season, data = ep_rating_short)
+kruskal.test(value ~ season, data = ep_rating_short)
+```
+
+
+
+
+
+```{r}
+ep_rating_df %>% 
+  filter(season %in% c(1, 5)) %>% 
+  group_by(season) %>% 
+  summarise(avg_rating = mean(value)) %>% 
+  mutate(diff_means = avg_rating - lead(avg_rating))
+
+# diff means
+ep_rating_df %>% 
+  mutate(season = as_factor(as.character(season))) %>% 
+  filter(season %in% c(1, 5)) %>% 
+  specify(value ~ season) %>% 
+  calculate("diff in means", order = c(5, 1)) -> diff_means
+
+# bootstrap means
+ep_rating_df %>% 
+  mutate(season = as_factor(as.character(season))) %>% 
+  filter(season %in% c(1, 5)) %>% 
+  specify(value ~ season) %>% 
+  generate(reps = 1000, type = "bootstrap") %>% 
+  calculate("diff in means", order = c(5, 1)) -> boot_means
+
+bootstrap_confint <- boot_means %>% get_confidence_interval()
+
+boot_means %>% 
+  visualise() +
+  shade_confidence_interval(bootstrap_confint,
+                            color = "red", fill = "blue") +
+  geom_vline(xintercept = diff_means$stat, size = 1, color = "green") +
+  theme_minimal()
+
+ep_rating_df %>% 
+  mutate(season = as_factor(as.character(season))) %>% 
+  filter(season %in% c(1, 5)) %>% 
+  specify(value ~ season) %>% 
+  hypothesize(null = "independence") %>% 
+  generate(reps = 5000, type = "permute") %>% 
+  calculate("diff in means", order = c(5, 1)) -> diffs_null
+
+diffs_null %>% 
+  visualize() +
+  geom_vline(xintercept = diff_means$stat, size = 1, color = "blue") +
+  scale_y_continuous(labels = comma) +
+  theme_minimal()
+
+diffs_null %>% 
+  get_p_value(obs_stat = diff_means, direction = "both") %>% 
+  mutate(p_value_clean = pvalue(p_value))
 ```
 
 
 
 ## ratings plot
+
+- low = "#c6dbef", high = "#0040FF", # low = "#E6FFFF", high = "#0040FF"
 
 ```{r}
 rating_plot <- ep_rating_df %>% 
@@ -94,9 +236,7 @@ rating_plot <- ep_rating_df %>%
   ggplot(aes(x = ep_num, y = season)) +
   geom_tile(aes(fill = value), size = 1.5,
             color = "black") +
-  # scale_fill_gradient(low = "#c6dbef", high = "#0040FF", # low = "#E6FFFF", high = "#0040FF"
-  #                      name = "Rating") +
-  scale_fill_gradientn(colors = dichromat::colorschemes$LightBluetoDarkBlue.10) +
+  scale_fill_gradientn("Rating", colors = dichromat::colorschemes$LightBluetoDarkBlue.10) +
   guides(fill = guide_colourbar(frame.colour = "black")) +
   scale_x_continuous(expand = c(0.01, 0.01), 
                      breaks = c(1, seq(from = 5, to = 20, by = 5), 23),
@@ -110,18 +250,18 @@ rating_plot <- ep_rating_df %>%
                       Source: IMDB
                       @R_By_Ryo")) +
   theme_minimal() +
-  theme(text = element_text(family = "Univers", color = "white"),
+  theme(text = element_text(family = "Univers", color = "#F9FEFF"),
         axis.title = element_text(size = 14),
-        axis.text = element_text(family = "Univers", color = "white", size = 12),
-        legend.title = element_text(family = "Univers", color = "white"),
-        legend.text = element_text(family = "Univers", color = "white"),
+        axis.text = element_text(family = "Univers", color = "#F9FEFF", size = 12),
+        legend.title = element_text(family = "Univers", color = "#F9FEFF"),
+        legend.text = element_text(family = "Univers", color = "#F9FEFF"),
         legend.position = "bottom",
         legend.key = element_rect(colour = "black", linetype = "solid", size = 1.5),
         legend.background = element_rect(color = "black", fill = "#0053CD",
                                          linetype = "solid"),
         plot.title = element_text(family = "Univers LT 93 ExtraBlackEx",
                                   size = 20,
-                                  color = "white"),
+                                  color = "#F9FEFF"),
         panel.grid = element_blank(),
         plot.background = element_rect(color = NA, fill = "#0053CD"),
         panel.background = element_rect(color = NA, fill = "#0053CD"))
@@ -153,6 +293,7 @@ cast_info_clean <- cast_info_raw %>%
     name == "Captain Ray Holt" ~ "Ray Holt",
     name == "Scully" ~ "Norm Scully",
     name == "Hitchcock" ~ "Michael Hitchcock",
+    name == "Deputy Chief Madeline Wuntch" ~ "Madeline Wuntch",
     TRUE ~ name
   ))
   
@@ -197,7 +338,7 @@ tategaki_alt <- function(x){
 ```
 
 
-```{r}
+```{r fig.height = 6, fig.width = 10}
 non_main_plot <- non_main_cast %>% 
   arrange(desc(episode_num)) %>% 
   head(5) %>% 
@@ -212,11 +353,14 @@ non_main_plot <- non_main_cast %>%
                      breaks = c(2, 4, 6, 8, 10, 12),
                      labels = c(2, 4, 6, 8, 10, 12)) +
   labs(title = "Most appearances by non-main cast", 
-       x = NULL, y = tategaki("Number of Episodes")) +
+       x = NULL, y = "Number of Episodes") +
   theme_minimal() +
   theme(text = element_text(family = "Univers", color = "#F9FEFF"),
-        axis.text = element_text(size = 8, color = "#F9FEFF"),
-        axis.title.y = element_text(angle = 0, vjust= 0.5),
+        axis.text = element_text(size = 12, color = "#F9FEFF"),
+        axis.title.y = element_text(size = 14), # angle = 0, vjust= 0.5, 
+        plot.title = element_text(family = "Univers LT 93 ExtraBlackEx",
+                                  size = 20,
+                                  color = "#F9FEFF"),
         plot.background = element_rect(color = NA, fill = "#0053CD"),
         panel.background = element_rect(color = NA, fill = "#0053CD"),
         panel.grid.major.x = element_blank())
@@ -336,7 +480,7 @@ brooklyn99_ep_info_df %>%
 - The Fugitive episodes are formatted differently... WHYYYY.gif
 - there are other multi-part episodes but this is the only one that aired on the same day on New Years Day 2017
 
-```{r}
+```{r fig.height = 4, fig.width = 10}
 viewers_df <- b99_ep_info_df %>% 
   select(season, num_season, title, num_overall, viewers) %>% 
   # manually fix The Fugitive episodes
@@ -354,7 +498,8 @@ viewers_df <- b99_ep_info_df %>%
          last = last(num_overall)) %>% 
   ungroup() 
 
-cols <- c("1" = "#FCF40E", "2" = "#3A3533", "3" = "#6CA9C3", "4" = "#0F0E0E", "5" = "#175E78")
+cols <- c("1" = "#FCF40E", "2" = "#3A3533", 
+          "3" = "#6CA9C3", "4" = "#0F0E0E", "5" = "#175E78")
 # yellow: #FCF40E
 # dark grey: #3A3533
 # light teal: #6CA9C3
@@ -375,7 +520,7 @@ viewer_plot <- viewers_df %>%
        title = "Viewers by Episode") +
   theme_minimal() +
   theme(text = element_text(family = "Univers", color = "#F9FEFF"),
-        axis.text = element_text(size = 8, color = "#F9FEFF"),
+        axis.text = element_text(size = 12, color = "#F9FEFF"),
         plot.background = element_rect(color = NA, fill = "#0053CD"), 
         panel.background = element_rect(color = NA, fill = "#0053CD"),
         panel.grid = element_blank()) +
@@ -448,23 +593,21 @@ ggplot(mtcars, aes(x = mpg, y = vs)) +
 ```{r fig.width = 12, fig.height = 5.5}
 #library(shadowtext)
 
-rect <- data.frame(id = c(1, 1, 1, 1),
-                   x = c(12, 12, 0,  0),
-                   y = c(5.1, 2, 0.4,  3.5))
+rect <- data.frame(id = as.factor(c(1, 1, 1, 1,
+                          2, 2, 2, 2)),
+                   x = c(12, 12, 0,  0,
+                         12, 12, 5.1,  4.9),
+                   y = c(5.1, 2, 0.4,  3.5,
+                         2.3, 0.95, 0,  1.3))
 
-rect2 <- data.frame(id = c(1, 1, 1, 1),
-                   x = c(12, 12, 5.1,  4.9),
-                   y = c(2.3, 0.95, 0,  1.3))
+# rect2 <- data.frame(id = c(1, 1, 1, 1),
+#                    x = c(12, 12, 5.1,  4.9),
+#                    y = c(2.3, 0.95, 0,  1.3))
 
-header <- ggplot() +
-  geom_polygon(data = rect, aes(x, y, group = id), fill = "#0053CD") +
-  geom_polygon(data = rect2, aes(x, y, group = id), fill = "#000E33") +
-  # annotate(geom = "text", y = 3, x = 1.5, hjust = 0,
-  #          family = "Univers LT 93 ExtraBlackEx", 
-  #          color = "#fcf7e8", size = 25, angle = 3.5,
-  #          label = glue("
-  #                       Brooklyn
-  #                           Nine-Nine")) +
+header <- ggplot(data = rect, aes(x, y, group = id, fill = id)) +
+  geom_polygon() +
+  scale_fill_manual(values = c("#0053CD", "#000E33"), guide = FALSE) +
+  #geom_polygon(data = rect2, aes(x, y, group = id), fill = "#000E33") +
   annotate(geom = "text", y = 2, x = 0.4, hjust = 0,
            family = "Univers LT 93 ExtraBlackEx", 
            color = "#fcf7e8", size = 35, angle = 7.5,
@@ -475,17 +618,6 @@ header <- ggplot() +
            color = "#fcf7e8", size = 25, angle = 7.5,
            label = glue("
                         NINE-NINE")) +
-  # geom_rect(aes(xmin = 1, xmax = 12,
-  #               ymin = 3, ymax = 10))
-  # annotate(geom = "polygon", fill = "red",
-  #          x = c(0, 0, 12, 12),
-  #          y = c(1, 3, 8, 10)) +
-  # annotate(geom = "text", y = 3, x = 2, hjust = 0,
-  #          family = "Univers LT 93 ExtraBlackEx", 
-  #          color = "#fcf7e8", size = 15, angle = 2.5,
-  #          label = glue("Brooklyn Nine-Nine")) +
-  # xlim(0, 12) +
-  # ylim(0, 6) +
   scale_x_continuous(expand = c(0, 0), limits = c(0, 12)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 5.5)) +
   theme_void() +
