@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Packages
 
-```{r}
+```{r warning=FALSE, message=FALSE}
 pacman::p_load(tidyverse, rvest, glue, cowplot,
                polite, extrafont, scales, gridExtra)
 loadfonts()
@@ -25,14 +25,23 @@ loadfonts()
 
 # B99 theme
 
+First, let me create a custom Brooklyn NINE NINE theme that I can put on all of my plots. This will save me time from typing in the same options over and over again!
+
+I googled what the font type that the official Brooklyn Nine Nine media used, downloaded them, and got it installed for R using the `extrafont` package.
+
 ```{r}
 theme_b99 <- function(){
+  
+  base_size <- 11
+  half_line <- base_size / 2
   
   theme_minimal() %+replace%
     theme(text = element_text(family = "Univers", color = "#F9FEFF",
                               face = "plain", size = 14, 
                               hjust = 0.5, vjust = 0.5, angle = 0,
-                              lineheight = 0.9, margin = margin(0),
+                              lineheight = 0.9, 
+                              margin = margin(half_line, half_line,
+                                              half_line, half_line),
                               debug = FALSE),
           plot.title = element_text(family = "Univers LT 93 ExtraBlackEx",
                                     size = 20, color = "#F9FEFF"),
@@ -43,66 +52,24 @@ theme_b99 <- function(){
           axis.title = element_text(size = 14),
           # legend options (for ratings plot)
           legend.title = element_text(family = "Univers", color = "#F9FEFF"),
-          legend.text = element_text(family = "Univers", color = "#F9FEFF"),
+          legend.text = element_text(family = "Univers", color = "#F9FEFF",
+                                     size = 9),
           legend.position = "bottom",
           legend.key = element_rect(colour = "black", linetype = "solid", size = 1.5),
           legend.background = element_rect(color = "black", fill = "#0053CD",
                                            linetype = "solid"))
 }
-
-viewers_df %>% 
-  ggplot(aes(x = num_overall, y = viewers)) +
-  geom_point() +
-  labs(title = "blahblahblah", x = "dododod", y = "lalalala") +
-  theme_b99()
-
-
-
-# ratings
- theme_minimal() +
-  theme(# text = element_text(family = "Univers", color = "#F9FEFF"),
-        # axis.title = element_text(size = 14),
-        # axis.text = element_text(family = "Univers", color = "#F9FEFF", size = 12),
-        # legend.title = element_text(family = "Univers", color = "#F9FEFF"),
-        # legend.text = element_text(family = "Univers", color = "#F9FEFF"),
-        # legend.position = "bottom",
-        # legend.key = element_rect(colour = "black", linetype = "solid", size = 1.5),
-        # legend.background = element_rect(color = "black", fill = "#0053CD",
-        #                                  linetype = "solid"),
-        # plot.title = element_text(family = "Univers LT 93 ExtraBlackEx",
-        #                           size = 20,
-        #                           color = "#F9FEFF"),
-        panel.grid = element_blank()#,
-        # plot.background = element_rect(color = NA, fill = "#0053CD"),
-        # panel.background = element_rect(color = NA, fill = "#0053CD")
-        )
-
-# cast 
-theme_minimal() +
-  theme(#text = element_text(family = "Univers", color = "#F9FEFF"),
-        # axis.text = element_text(size = 12, color = "#F9FEFF"),
-        # plot.background = element_rect(color = NA, fill = "#0053CD"),
-        # panel.background = element_rect(color = NA, fill = "#0053CD"),
-        panel.grid.major.x = element_blank())
-
-# viewers
-theme_minimal() +
-  theme(#text = element_text(family = "Univers", color = "#F9FEFF"),
-        # axis.text = element_text(size = 12, color = "#F9FEFF"),
-        # plot.background = element_rect(color = NA, fill = "#0053CD"), 
-        # panel.background = element_rect(color = NA, fill = "#0053CD"),
-        panel.grid = element_blank())
-
 ```
 
 
 
 # Episode ratings
 
+Calling `as_tibble()` on a vector is discouraged, because the behavior is likely to change in the future. Use `enframe(name = NULL)` instead.
+
+As in my more [recent]() blog posts I will use the `polite` package to web scrape responsibly.
+
 ```{r}
-# Calling `as_tibble()` on a vector is discouraged, because the behavior is likely to change in the future. Use `enframe(name = NULL)` instead.
-
-
 url_df <- tibble(
   urls = c("https://www.imdb.com/title/tt2467372/episodes?season=1",
            "https://www.imdb.com/title/tt2467372/episodes?season=2",
@@ -123,6 +90,7 @@ brooklyn99_ep_rating <- function(url) {
     html_text() %>% 
     enframe(name = value) %>% 
     mutate(value = gsub("\\n", "", x = value))
+  
   # Grab episode rating
   sX_rate <- url2 %>% 
     html_nodes(".ipl-rating-widget > .ipl-rating-star .ipl-rating-star__rating") %>% 
@@ -226,6 +194,8 @@ diffs_null %>%
 
 ## ratings plot
 
+Here I used the `dichromat` package for the color scheme "LightBluetoDarkBlue.10". It meshes pretty well with the Brooklyn 99 color theme!
+
 - low = "#c6dbef", high = "#0040FF", # low = "#E6FFFF", high = "#0040FF"
 
 ```{r}
@@ -236,8 +206,10 @@ rating_plot <- ep_rating_df %>%
   ggplot(aes(x = ep_num, y = season)) +
   geom_tile(aes(fill = value), size = 1.5,
             color = "black") +
-  scale_fill_gradientn("Rating", colors = dichromat::colorschemes$LightBluetoDarkBlue.10) +
-  guides(fill = guide_colourbar(frame.colour = "black")) +
+  scale_fill_gradientn("Rating", colors = dichromat::colorschemes$LightBluetoDarkBlue.10,
+                       breaks = c(7.7, 8, 8.5, 9, 9.5)) +
+  guides(fill = guide_colourbar(frame.colour = "black",
+                                barwidth = unit(2, "in"))) +
   scale_x_continuous(expand = c(0.01, 0.01), 
                      breaks = c(1, seq(from = 5, to = 20, by = 5), 23),
                      labels = c(1, seq(from = 5, to = 20, by = 5), 23)) +
@@ -249,22 +221,8 @@ rating_plot <- ep_rating_df %>%
        caption = glue("
                       Source: IMDB
                       @R_By_Ryo")) +
-  theme_minimal() +
-  theme(text = element_text(family = "Univers", color = "#F9FEFF"),
-        axis.title = element_text(size = 14),
-        axis.text = element_text(family = "Univers", color = "#F9FEFF", size = 12),
-        legend.title = element_text(family = "Univers", color = "#F9FEFF"),
-        legend.text = element_text(family = "Univers", color = "#F9FEFF"),
-        legend.position = "bottom",
-        legend.key = element_rect(colour = "black", linetype = "solid", size = 1.5),
-        legend.background = element_rect(color = "black", fill = "#0053CD",
-                                         linetype = "solid"),
-        plot.title = element_text(family = "Univers LT 93 ExtraBlackEx",
-                                  size = 20,
-                                  color = "#F9FEFF"),
-        panel.grid = element_blank(),
-        plot.background = element_rect(color = NA, fill = "#0053CD"),
-        panel.background = element_rect(color = NA, fill = "#0053CD"))
+  theme_b99() +
+  theme(panel.grid = element_blank())
 
 rating_plot
 ```
@@ -323,20 +281,7 @@ non_main_cast <- anti_join(cast_info_clean, cast_main_clean, by = c("name" = "Ch
 
 ## cast plot
 
-```{r}
-# http://id.fnshr.info/2017/03/13/r-plot-tategaki/
-tategaki <- function(x){
-  x <- chartr("ー", "丨", x) # 長音符の処理
-  x <- strsplit(split="", x)
-  sapply(x, paste, collapse="\n")
-}
-
-tategaki_alt <- function(x){
-  x <- stringr::str_replace_all(x, "ー", "丨") # 長音符の処理
-  stringr::str_wrap(x, width = 1)
-}
-```
-
+I create a "halfway" variable so that the number labels will appear right in the middle of each bar. Using the `axis_canvas()`, `draw_image()`, and `insert_axis_grob()` from the `cowplot` package I can insert images of the characters along the bottom of the plot.
 
 ```{r fig.height = 6, fig.width = 10}
 non_main_plot <- non_main_cast %>% 
@@ -353,17 +298,12 @@ non_main_plot <- non_main_cast %>%
                      breaks = c(2, 4, 6, 8, 10, 12),
                      labels = c(2, 4, 6, 8, 10, 12)) +
   labs(title = "Most appearances by non-main cast", 
-       x = NULL, y = "Number of Episodes") +
-  theme_minimal() +
-  theme(text = element_text(family = "Univers", color = "#F9FEFF"),
-        axis.text = element_text(size = 12, color = "#F9FEFF"),
-        axis.title.y = element_text(size = 14), # angle = 0, vjust= 0.5, 
-        plot.title = element_text(family = "Univers LT 93 ExtraBlackEx",
-                                  size = 20,
-                                  color = "#F9FEFF"),
-        plot.background = element_rect(color = NA, fill = "#0053CD"),
-        panel.background = element_rect(color = NA, fill = "#0053CD"),
-        panel.grid.major.x = element_blank())
+       x = NULL, y = "Number of Episodes",
+       caption = glue("
+                      Source: IMDB
+                      @R_By_Ryo")) +
+  theme_b99() +
+  theme(panel.grid.major.x = element_blank())
 
 # images
 pimage <- axis_canvas(non_main_plot, axis = 'x') + 
@@ -382,7 +322,11 @@ pimage <- axis_canvas(non_main_plot, axis = 'x') +
 ggdraw(insert_xaxis_grob(non_main_plot, pimage, position = "bottom"))
 ```
 
+Adrian has appeared in the most episodes just beating out Kevin. This really shows how involved Adrian was in the story in Season 4 and 5 especially compared to Kevin who has periodically appeared since the first season.
 
+Everybody's favorite DOUG JUDY rounds off this bar chart.
+
+![doug judy singing gif]()
 
 
 
@@ -480,6 +424,8 @@ brooklyn99_ep_info_df %>%
 - The Fugitive episodes are formatted differently... WHYYYY.gif
 - there are other multi-part episodes but this is the only one that aired on the same day on New Years Day 2017
 
+At the end I create a `first` and `last` variable for each season taking note of what overall number the first and last episodes of a season were. You'll see why I did this soon.
+
 ```{r fig.height = 4, fig.width = 10}
 viewers_df <- b99_ep_info_df %>% 
   select(season, num_season, title, num_overall, viewers) %>% 
@@ -498,36 +444,61 @@ viewers_df <- b99_ep_info_df %>%
          last = last(num_overall)) %>% 
   ungroup() 
 
-cols <- c("1" = "#FCF40E", "2" = "#3A3533", 
-          "3" = "#6CA9C3", "4" = "#0F0E0E", "5" = "#175E78")
+cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
+          "3" = "#000E33", "4" = "#CBCFD2", "5" = "#175E78")
 # yellow: #FCF40E
 # dark grey: #3A3533
 # light teal: #6CA9C3
 # black: #0F0E0E
 # navy: #175E78
+```
 
+I use `geom_rect()` here to give a colored background for each season. Setting the span of the Xs as the first and last of each season and then using Inf and -Inf for the Ys to cover the entire height of the plot.
+
+```{r fig.height = 6, fig.width = 11}
 viewer_plot <- viewers_df %>% 
   ggplot(aes(x = num_overall, y = viewers, group = season)) +
   geom_rect(aes(xmin = first, xmax = last,
                 fill = season), alpha = 0.2,
             ymin = -Inf, ymax = Inf) +
-  geom_line(color = "white") +
+  geom_line(color = "white", size = 1.1) +
   scale_fill_manual("Season", values = cols, guide = FALSE) +
-  scale_y_continuous(limits = c(0, 20)) +
-  scale_x_continuous(breaks = c(seq(0, 120, by = 5)),
-                     labels = c(seq(0, 120, by = 5))) +
+  scale_y_continuous(limits = c(0, 20),
+                     breaks = c(seq(0, 15, by = 5)),
+                     expand = c(0, 0)) +
+  scale_x_continuous(breaks = c(seq(0, 112, by = 5)),
+                     labels = c(seq(0, 112, by = 5)),
+                     expand = c(0, 0)) +
   labs(x = "Episode Number (Overall)", y = "Viewers (Millions)",
-       title = "Viewers by Episode") +
-  theme_minimal() +
-  theme(text = element_text(family = "Univers", color = "#F9FEFF"),
-        axis.text = element_text(size = 12, color = "#F9FEFF"),
-        plot.background = element_rect(color = NA, fill = "#0053CD"), 
-        panel.background = element_rect(color = NA, fill = "#0053CD"),
-        panel.grid = element_blank()) +
-  annotate(geom = "label", x = 20, y = 17, label = "Aired after Super Bowl!")
+       title = "Viewers by Episode",
+       caption = glue("
+                      Source: Nielsen Media Research
+                      @R_By_Ryo")) +
+  theme_b99() +
+  theme(panel.grid = element_blank()) +
+  annotate(geom = "segment", x = 15, xend = 15, y = 15, yend = 16, 
+           color = "black", size = 1.2) +
+  annotate(geom = "segment", x = 34, xend = 34, y = 6, yend = 7, 
+           color = "black", size = 1.2) +
+  annotate(geom = "segment", x = 79.5, xend = 79.5, y = 3.5, yend = 5, 
+           color = "black", size = 1.2) +
+  annotate(geom = "label", x = 7, y = 16, hjust = 0,
+           family = "Univers",
+           label = "Operation: Broken Feather (Aired after Super Bowl XLVIII)") +
+  annotate(geom = "label", x = 27, y = 7.5, hjust = 0,
+           family = "Univers",
+           label = "Beach House (Sunday before First Workday of 2015)") +
+  annotate(geom = "label", x = 72, y = 5, hjust = 0,
+           family = "Univers",
+           label = "The Fugitive: Part 1 & 2 (New Years Day 2017)")
 
 viewer_plot
 ```
+
+not sure about the Season 3 episodes
+
+although one of them was a Halloween episode which fights with the Pontiac Bandit for best recurring episode
+but in terms of the actual dates that those episodes aired I can't quite remember anything significant happening.
 
 
 # colors & fonts
