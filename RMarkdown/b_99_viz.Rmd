@@ -252,8 +252,7 @@ cast_info_clean <- cast_info_raw %>%
     name == "Scully" ~ "Norm Scully",
     name == "Hitchcock" ~ "Michael Hitchcock",
     name == "Deputy Chief Madeline Wuntch" ~ "Madeline Wuntch",
-    TRUE ~ name
-  ))
+    TRUE ~ name))
   
 # MAIN cast
 cast_main_url <- bow("https://en.wikipedia.org/wiki/List_of_Brooklyn_Nine-Nine_characters")
@@ -283,13 +282,16 @@ non_main_cast <- anti_join(cast_info_clean, cast_main_clean, by = c("name" = "Ch
 
 I create a "halfway" variable so that the number labels will appear right in the middle of each bar. Using the `axis_canvas()`, `draw_image()`, and `insert_axis_grob()` from the `cowplot` package I can insert images of the characters along the bottom of the plot.
 
+"1" = "#6CA9C3", "2" = "#3A3533", 
+          "3" = "#000E33"
+
 ```{r fig.height = 6, fig.width = 10}
 non_main_plot <- non_main_cast %>% 
   arrange(desc(episode_num)) %>% 
   head(5) %>% 
   mutate(halfway = episode_num / 2) %>% 
   ggplot(aes(x = reorder(name, desc(episode_num)), y = episode_num)) +
-  geom_col(fill = "#3A3533") +
+  geom_col(fill = "#000E33") +
   geom_text(aes(y = halfway, label = episode_num,
                 family = "Univers"),
             color = "#F9FEFF",
@@ -333,13 +335,6 @@ Everybody's favorite DOUG JUDY rounds off this bar chart.
 # Viewer numbers
 
 ```{r}
-# viewer_url <- bow("https://en.wikipedia.org/wiki/List_of_Brooklyn_Nine-Nine_episodes")
-
-# .wikiepisodetable tr :nth-child(8)
-# .vevent td , .wikiepisodetable th
-# .wikiepisodetable th , .vevent td
-
-
 url_wiki_df <- tibble(
   urls = c("https://en.wikipedia.org/wiki/Brooklyn_Nine-Nine_(season_1)",
            "https://en.wikipedia.org/wiki/Brooklyn_Nine-Nine_(season_2)",
@@ -347,22 +342,6 @@ url_wiki_df <- tibble(
            "https://en.wikipedia.org/wiki/Brooklyn_Nine-Nine_(season_4)",
            "https://en.wikipedia.org/wiki/Brooklyn_Nine-Nine_(season_5)"),
   season_num = c(1, 2, 3, 4, 5))
-
-
-# session <- bow("https://en.wikipedia.org/wiki/Brooklyn_Nine-Nine_(season_1)")
-# 
-# episode_raw <- scrape(session) %>% 
-#   html_nodes(".wikiepisodetable") %>% 
-#   html_table(fill = TRUE) %>% 
-#   flatten_df() %>% 
-#   as_tibble() %>% 
-#   filter(row_number() %% 2 != 0)
-#   
-# episode_tab <- episode_raw %>% 
-#   set_names(c("num_overall", "num_season", "title", "director", "writer",
-#               "air_date", "prod_code", "viewers")) %>% 
-#   mutate(viewers = str_remove_all(viewers, "\\[[0-9]+\\]") %>% as.numeric)
-
 
 brooklyn99_ep_info <- function(url) {
   
@@ -382,21 +361,20 @@ brooklyn99_ep_info <- function(url) {
   
 }
 
-brooklyn99_ep_info_df <- map2(.x = url_wiki_df$urls, .y = url_wiki_df$season_num,
+b99_ep_info_df <- map2(.x = url_wiki_df$urls, .y = url_wiki_df$season_num,
                           ~ brooklyn99_ep_info(url = .x) %>% 
          mutate(season = .y)) %>% 
   reduce(rbind)
 
-saveRDS(brooklyn99_ep_info_df, "../data/brooklyn99_ep_info_df.RDS")
-b99_ep_info_df <- readRDS("../data/brooklyn99_ep_info_df.RDS")
-b99_ep_info_df %>% glimpse()
+# saveRDS(b99_ep_info_df, "../data/b99_ep_info_df.RDS")
+b99_ep_info_df <- readRDS("../data/b99_ep_info_df.RDS")
 ```
 
 - use `separate_rows()` for writers and directors?
 
 
 ```{r}
-brooklyn99_ep_info_df %>% 
+b99_ep_info_df %>% 
   select(season, num_season, title, num_overall, writer, viewers) %>% 
   separate_rows(writer, sep = "&") %>% 
   mutate(writer = writer %>% trimws) %>% 
@@ -408,7 +386,7 @@ brooklyn99_ep_info_df %>%
 ```
 
 ```{r}
-brooklyn99_ep_info_df %>% 
+b99_ep_info_df %>% 
   select(season, num_season, title, num_overall, director, viewers) %>% 
   separate_rows(director, sep = "&") %>% 
   mutate(director = director %>% trimws) %>% 
@@ -455,6 +433,8 @@ cols <- c("1" = "#6CA9C3", "2" = "#3A3533",
 
 I use `geom_rect()` here to give a colored background for each season. Setting the span of the Xs as the first and last of each season and then using Inf and -Inf for the Ys to cover the entire height of the plot.
 
+For the season labels i calculated the midpoint along the x-axis per each season and used that as the x values (not shown in the code). I could have used facets but to the best of my knowledge I wouldn't have been able to place the labels on top across multiple facets anyways. Probably possible by placing text grobs on top of the facetted plot but I thought that would take more time compared to what I did with `geom_rect()`.
+
 ```{r fig.height = 6, fig.width = 11}
 viewer_plot <- viewers_df %>% 
   ggplot(aes(x = num_overall, y = viewers, group = season)) +
@@ -476,21 +456,39 @@ viewer_plot <- viewers_df %>%
                       @R_By_Ryo")) +
   theme_b99() +
   theme(panel.grid = element_blank()) +
-  annotate(geom = "segment", x = 15, xend = 15, y = 15, yend = 16, 
+  # Line segments
+  annotate(geom = "segment", x = 15, xend = 15, y = 15, yend = 16., 
            color = "black", size = 1.2) +
   annotate(geom = "segment", x = 34, xend = 34, y = 6, yend = 7, 
            color = "black", size = 1.2) +
   annotate(geom = "segment", x = 79.5, xend = 79.5, y = 3.5, yend = 5, 
            color = "black", size = 1.2) +
-  annotate(geom = "label", x = 7, y = 16, hjust = 0,
+  # Episode details
+  annotate(geom = "label", x = 7, y = 16.5, hjust = 0, size = 4.5,
            family = "Univers",
            label = "Operation: Broken Feather (Aired after Super Bowl XLVIII)") +
-  annotate(geom = "label", x = 27, y = 7.5, hjust = 0,
+  annotate(geom = "label", x = 25, y = 7.5, hjust = 0, size = 4.5, 
            family = "Univers",
            label = "Beach House (Sunday before First Workday of 2015)") +
-  annotate(geom = "label", x = 72, y = 5, hjust = 0,
+  annotate(geom = "label", x = 67, y = 5, hjust = 0, size = 4.5,
            family = "Univers",
-           label = "The Fugitive: Part 1 & 2 (New Years Day 2017)")
+           label = "The Fugitive: Part 1 & 2 (New Years Day 2017)") +
+  # Season titles
+  annotate(geom = "label", x = 11.5, y = 19, size = 7,
+           family = "Univers",
+           label = "Season One") +
+  annotate(geom = "label", x = 34, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Two") +
+  annotate(geom = "label", x = 57, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Three") +
+  annotate(geom = "label", x = 79.5, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Four") +
+  annotate(geom = "label", x = 102, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Five") 
 
 viewer_plot
 ```
