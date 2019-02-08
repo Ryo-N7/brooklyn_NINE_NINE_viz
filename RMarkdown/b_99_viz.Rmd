@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 - Terry loves `ggplot2`!
 - yippie-kayak other buckets!
 - Noice. Toit.
-
+- fine i was trying something and it didnt work! .gif
 
 # Packages
 
@@ -198,7 +198,7 @@ Here I used the `dichromat` package for the color scheme "LightBluetoDarkBlue.10
 
 - low = "#c6dbef", high = "#0040FF", # low = "#E6FFFF", high = "#0040FF"
 
-```{r}
+```{r fig.height=5, fig.width=7}
 rating_plot <- ep_rating_df %>% 
   group_by(season) %>% 
   mutate(ep_num = row_number()) %>% 
@@ -217,7 +217,7 @@ rating_plot <- ep_rating_df %>%
                   breaks = c(1:7), 
                   labels = c(1:7)) +
   labs(x = "Episode Number", y = "Season",
-       title = "Brooklyn Nine-Nine",
+       title = "Episode Ratings",
        caption = glue("
                       Source: IMDB
                       @R_By_Ryo")) +
@@ -321,7 +321,9 @@ pimage <- axis_canvas(non_main_plot, axis = 'x') +
              x = 4.5, scale = 0.9)
 
 # insert the image strip into the bar plot and draw  
-ggdraw(insert_xaxis_grob(non_main_plot, pimage, position = "bottom"))
+ncast_plot <- ggdraw(insert_xaxis_grob(non_main_plot, pimage, position = "bottom"))
+
+ncast_plot
 ```
 
 Adrian has appeared in the most episodes just beating out Kevin. This really shows how involved Adrian was in the story in Season 4 and 5 especially compared to Kevin who has periodically appeared since the first season.
@@ -605,5 +607,41 @@ header
 ?cowplot::plot_grid()
 grid::textGrob()
 grid::circleGrob()
+```
+
+## grid
+
+```{r fig.height=12, fig.width=16}
+grid.arrange(
+  ncast_plot,
+  rating_plot,
+  viewer_plot,
+  header,
+  heights = c(1, 1, 0.05, 1),
+  widths = c(2, 2, 0.1, 2, 2),
+  layout_matrix = rbind(c(4, 4, 4, 4, 4),
+                        c(1, 1, NA, 2, 2),
+                        c(NA, NA, NA, NA, NA),
+                        c(3, 3, 3, 3, 3))
+)
+```
+
+## patchwork
+
+```{r fig.height=20, fig.width=40}
+library(patchwork)
+
+ncast_plot + rating_plot + plot_layout(ncol = 2, 
+                                       widths = c(35),
+                                       heights = c(30))
+
+rating_plot + viewer_plot + plot_layout(ncol = 2, 
+                                        widths = 30)
+```
+
+## cowplot
+
+```{r}
+
 ```
 
