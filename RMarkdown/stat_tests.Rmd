@@ -1,0 +1,86 @@
+---
+title: "Untitled"
+author: "RN7"
+date: "February 9, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# episode rating stats
+
+
+```{r}
+ep_rating_df %>% 
+  arrange(desc(value)) %>% 
+  head(10)
+
+library(infer)
+
+
+# check variances
+
+ep_rating_df %>% 
+  mutate(season = as_factor(as.character(season))) %>% 
+  filter(season %in% c(1, 5)) -> ep_rating_short
+
+car::leveneTest(value ~ season, data = ep_rating_short)
+kruskal.test(value ~ season, data = ep_rating_short)
+```
+
+
+```{r}
+ep_rating_df %>% 
+  filter(season %in% c(1, 5)) %>% 
+  group_by(season) %>% 
+  summarise(avg_rating = mean(value)) %>% 
+  mutate(diff_means = avg_rating - lead(avg_rating))
+
+# diff means
+ep_rating_df %>% 
+  mutate(season = as_factor(as.character(season))) %>% 
+  filter(season %in% c(1, 5)) %>% 
+  specify(value ~ season) %>% 
+  calculate("diff in means", order = c(5, 1)) -> diff_means
+
+# bootstrap means
+ep_rating_df %>% 
+  mutate(season = as_factor(as.character(season))) %>% 
+  filter(season %in% c(1, 5)) %>% 
+  specify(value ~ season) %>% 
+  generate(reps = 1000, type = "bootstrap") %>% 
+  calculate("diff in means", order = c(5, 1)) -> boot_means
+
+bootstrap_confint <- boot_means %>% get_confidence_interval()
+
+boot_means %>% 
+  visualise() +
+  shade_confidence_interval(bootstrap_confint,
+                            color = "red", fill = "blue") +
+  geom_vline(xintercept = diff_means$stat, size = 1, color = "green") +
+  theme_minimal()
+
+ep_rating_df %>% 
+  mutate(season = as_factor(as.character(season))) %>% 
+  filter(season %in% c(1, 5)) %>% 
+  specify(value ~ season) %>% 
+  hypothesize(null = "independence") %>% 
+  generate(reps = 5000, type = "permute") %>% 
+  calculate("diff in means", order = c(5, 1)) -> diffs_null
+
+diffs_null %>% 
+  visualize() +
+  geom_vline(xintercept = diff_means$stat, size = 1, color = "blue") +
+  scale_y_continuous(labels = comma) +
+  theme_minimal()
+
+diffs_null %>% 
+  get_p_value(obs_stat = diff_means, direction = "both") %>% 
+  mutate(p_value_clean = pvalue(p_value))
+```
+
+```
+

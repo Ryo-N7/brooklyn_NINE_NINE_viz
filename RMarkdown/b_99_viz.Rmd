@@ -9,8 +9,12 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-- hey there criminal, it's me johnny law!
-- Terry loves `ggplot2`!
+"Hey there criminal. It's me, Johnny Law!" - Jake Peralta, NYPD.
+
+Brooklyn Nine-Nine has become one of my favorite sitcoms in recent years, probably taking over from Parks & Recreation. So in this blog post, I'm going to webscrape some very simple statistics, tidy it up with the `tidyverse`, and visualize it with `ggplot2`. 
+
+"Terry loves `ggplot2`!"
+
 - yippie-kayak other buckets!
 - Noice. Toit.
 - fine i was trying something and it didnt work! .gif
@@ -20,14 +24,12 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r warning=FALSE, message=FALSE}
 pacman::p_load(tidyverse, rvest, glue, cowplot,
                polite, extrafont, scales, gridExtra)
-loadfonts()
+loadfonts() # "Univers" and "Univers LT 93 ExtraBlackEx" fonts
 ```
 
 # B99 theme
 
-First, let me create a custom Brooklyn NINE NINE theme that I can put on all of my plots. This will save me time from typing in the same options over and over again!
-
-I googled what the font type that the official Brooklyn Nine Nine media used, downloaded them, and got it installed for R using the `extrafont` package.
+First, let me create a custom Brooklyn NINE NINE theme that I can put on all of my plots. This will save me time from typing in the same options over and over again! I googled the font type that official Brooklyn Nine Nine media used, downloaded them, and got it installed for R using the `extrafont` package. For some of the different colors you'll see in the plots I sourced them from pasting in the Brooklyn Nine-Nine logo and other official media images into [imagecolorpicker.com](https://imagecolorpicker.com/en) and saving the hex codes that it gave me. Otherwise, I experimented with different palettes from perusing [Emil Hvitfeld's]() awesome [r-color-palettes](https://github.com/EmilHvitfeldt/r-color-palettes) Github repository (Also special thanks to [David Smale]() for giving me some advice on using color!).
 
 ```{r}
 theme_b99 <- function(){
@@ -61,13 +63,15 @@ theme_b99 <- function(){
 }
 ```
 
-
+With that done, I can start making plots!
 
 # Episode ratings
 
 Calling `as_tibble()` on a vector is discouraged, because the behavior is likely to change in the future. Use `enframe(name = NULL)` instead.
 
-As in my more [recent]() blog posts I will use the `polite` package to web scrape responsibly.
+As in my more [recent]() blog posts I will use the `polite` package to web scrape responsibly (note the `bow()` and `scrape()` functions).
+
+I `map_2()` over the IMDB page for the episodes for each season and I append the season number to each episode row. After I'm done with the webscraping I `mutate()` in the episode number for each season.
 
 ```{r}
 url_df <- tibble(
@@ -88,14 +92,14 @@ brooklyn99_ep_rating <- function(url) {
   sX_ep_name <- url2 %>% 
     html_nodes(".info a") %>% 
     html_text() %>% 
-    enframe(name = value) %>% 
+    as_tibble() %>% 
     mutate(value = gsub("\\n", "", x = value))
   
   # Grab episode rating
   sX_rate <- url2 %>% 
     html_nodes(".ipl-rating-widget > .ipl-rating-star .ipl-rating-star__rating") %>% 
     html_text() %>% 
-    enframe(name = value) %>% 
+    as_tibble() %>%  
     mutate(value = gsub("\\n", "", x = value) %>% as.numeric)
   
   # Clean episode name df
@@ -109,97 +113,55 @@ brooklyn99_ep_rating <- function(url) {
     bind_cols(sX_rate)
 }
 
-brooklyn99_ep_rating_df <- map2(.x = url_df$urls, .y = url_df$season_num,
+ep_rating_df <- map2(.x = url_df$urls, .y = url_df$season_num,
                           ~ brooklyn99_ep_rating(url = .x) %>% 
          mutate(season = .y)) %>% 
-  reduce(rbind)
+  reduce(bind_rows)
 
-#saveRDS(brooklyn99_ep_rating_df, "../data/brooklyn99_ep_rating_df.RDS")
-ep_rating_df <- readRDS("../data/brooklyn99_ep_rating_df.RDS")
-```
+#saveRDS(ep_rating_df, "../data/ep_rating_df.RDS")
+ep_rating_df <- readRDS("../data/ep_rating_df.RDS")
 
-```{r}
-ep_rating_df %>% 
-  arrange(desc(value)) %>% 
-  head(10)
-
-library(infer)
-
-
-# check variances
-
-ep_rating_df %>% 
-  mutate(season = as_factor(as.character(season))) %>% 
-  filter(season %in% c(1, 5)) -> ep_rating_short
-
-car::leveneTest(value ~ season, data = ep_rating_short)
-kruskal.test(value ~ season, data = ep_rating_short)
-```
-
-
-
-
-
-```{r}
-ep_rating_df %>% 
-  filter(season %in% c(1, 5)) %>% 
+ep_rating_df <- ep_rating_df %>% 
   group_by(season) %>% 
-  summarise(avg_rating = mean(value)) %>% 
-  mutate(diff_means = avg_rating - lead(avg_rating))
+  mutate(ep_num = row_number()) %>% 
+  ungroup()
 
-# diff means
-ep_rating_df %>% 
-  mutate(season = as_factor(as.character(season))) %>% 
-  filter(season %in% c(1, 5)) %>% 
-  specify(value ~ season) %>% 
-  calculate("diff in means", order = c(5, 1)) -> diff_means
-
-# bootstrap means
-ep_rating_df %>% 
-  mutate(season = as_factor(as.character(season))) %>% 
-  filter(season %in% c(1, 5)) %>% 
-  specify(value ~ season) %>% 
-  generate(reps = 1000, type = "bootstrap") %>% 
-  calculate("diff in means", order = c(5, 1)) -> boot_means
-
-bootstrap_confint <- boot_means %>% get_confidence_interval()
-
-boot_means %>% 
-  visualise() +
-  shade_confidence_interval(bootstrap_confint,
-                            color = "red", fill = "blue") +
-  geom_vline(xintercept = diff_means$stat, size = 1, color = "green") +
-  theme_minimal()
-
-ep_rating_df %>% 
-  mutate(season = as_factor(as.character(season))) %>% 
-  filter(season %in% c(1, 5)) %>% 
-  specify(value ~ season) %>% 
-  hypothesize(null = "independence") %>% 
-  generate(reps = 5000, type = "permute") %>% 
-  calculate("diff in means", order = c(5, 1)) -> diffs_null
-
-diffs_null %>% 
-  visualize() +
-  geom_vline(xintercept = diff_means$stat, size = 1, color = "blue") +
-  scale_y_continuous(labels = comma) +
-  theme_minimal()
-
-diffs_null %>% 
-  get_p_value(obs_stat = diff_means, direction = "both") %>% 
-  mutate(p_value_clean = pvalue(p_value))
+glimpse(ep_rating_df)
 ```
 
+OK, looks good.
 
+## Episode Ratings Plot
 
-## ratings plot
-
-Here I used the `dichromat` package for the color scheme "LightBluetoDarkBlue.10". It meshes pretty well with the Brooklyn 99 color theme!
-
-- low = "#c6dbef", high = "#0040FF", # low = "#E6FFFF", high = "#0040FF"
+I used `geom_tile()` to create a heatmap of episode ratings with the season number as the rows and the episode number for that season as the columns. I used the `dichromat` package for the color scheme "LightBluetoDarkBlue.10", it meshes pretty well with the Brooklyn 99 color theme!
 
 ```{r fig.height=5, fig.width=7}
 rating_plot <- ep_rating_df %>% 
+  ggplot(aes(x = ep_num, y = season)) +
+  geom_tile(aes(fill = value), size = 1.5,
+            color = "black") +
+  scale_fill_gradientn("Rating", colors = dichromat::colorschemes$LightBluetoDarkBlue.10,
+                       breaks = c(7.7, 8, 8.5, 9, 9.5)) +
+  guides(fill = guide_colourbar(frame.colour = "black",
+                                barwidth = unit(2, "in"))) +
+  scale_x_continuous(expand = c(0.01, 0.01), 
+                     breaks = c(1, seq(from = 5, to = 20, by = 5), 23),
+                     labels = c(1, seq(from = 5, to = 20, by = 5), 23)) +
+  scale_y_reverse(expand = c(0.01, 0.01),
+                  breaks = c(1:7), 
+                  labels = c(1:7)) +
+  labs(x = "Episode Number", y = "Season",
+       title = "Episode Ratings") +
+  theme_b99() +
+  theme(panel.grid = element_blank())
+
+rating_plot
+```
+
+From what we can see on the graph there doesn't seem to be any trends along either axes besides the fact that the finales and the subsequent opening episode of the following season are well-received. The two stand out episodes that can be cleary seen are from Season 5. These episodes are "" with  and ""  . 
+
+```{r fig.height=5, fig.width=7, echo=FALSE, eval=FALSE}
+rating_plot2 <- ep_rating_df %>% 
   group_by(season) %>% 
   mutate(ep_num = row_number()) %>% 
   ungroup() %>% 
@@ -224,12 +186,14 @@ rating_plot <- ep_rating_df %>%
   theme_b99() +
   theme(panel.grid = element_blank())
 
-rating_plot
+rating_plot2
 ```
-
 
 # Cast appearances
 
+The main cast of B99 are pretty tightly knit and as members of the same precinct it makes sense that they'll generally appear together. So I wanted to look at what non-main cast members and guests made the most appearances on the show. Special note: Hitchcock and Scully weren't officially "main cast" until Season 2 but I left them out of the non-main cast list.
+
+Finally I `anti_join()` the main cast list from the full cast list so I am left with the non-main cast and the number of episodes taht they appeared in.
 
 ```{r}
 cast_url <- bow("https://www.imdb.com/title/tt2467372/fullcredits?ref_=tt_cl_sm#cast")
@@ -278,14 +242,56 @@ cast_main_clean <- readRDS("../data/cast_main_clean.RDS")
 non_main_cast <- anti_join(cast_info_clean, cast_main_clean, by = c("name" = "Character"))
 ```
 
-## cast plot
+## Non-Main Cast Appearances Plot
 
-I create a "halfway" variable so that the number labels will appear right in the middle of each bar. Using the `axis_canvas()`, `draw_image()`, and `insert_axis_grob()` from the `cowplot` package I can insert images of the characters along the bottom of the plot.
-
-"1" = "#6CA9C3", "2" = "#3A3533", 
-          "3" = "#000E33"
+To shorten the list I'll just look at the top five cast members. I create a "halfway" variable so that the number labels will appear right in the middle of each bar. Using the `axis_canvas()`, `draw_image()`, and `insert_axis_grob()` from the `cowplot` package I can insert images of the characters along the bottom of the plot.
 
 ```{r fig.height = 6, fig.width = 10}
+non_main_plot <- non_main_cast %>% 
+  arrange(desc(episode_num)) %>% 
+  head(5) %>% 
+  mutate(halfway = episode_num / 2) %>% 
+  ggplot(aes(x = reorder(name, desc(episode_num)), y = episode_num)) +
+  geom_col(fill = "#000E33") +
+  geom_text(aes(y = halfway, label = episode_num,
+                family = "Univers"),
+            color = "#F9FEFF",
+            size = 8) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 12.5),
+                     breaks = c(2, 4, 6, 8, 10, 12),
+                     labels = c(2, 4, 6, 8, 10, 12)) +
+  labs(title = "Most appearances by non-main cast", 
+       x = NULL, y = "Number of Episodes") +
+  theme_b99() +
+  theme(panel.grid.major.x = element_blank())
+
+# images
+pimage <- axis_canvas(non_main_plot, axis = 'x') + 
+  draw_image("https://vignette.wikia.nocookie.net/tvdatabase/images/d/d5/Adrian_Pimento.jpg", 
+             x = 0.5, scale = 0.9) +
+  draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/a/ab/Kevin.jpg", 
+             x = 1.5, scale = 0.9) +
+  draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/b/b3/Wuntch.png", 
+             x = 2.5, scale = 0.9) +
+  draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/2/23/Vulture.jpg", 
+             x = 3.5, scale = 0.9) +
+  draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/0/0a/Doug_Judy.png",
+             x = 4.5, scale = 0.9)
+
+# insert the image strip into the bar plot and draw  
+ncast_plot <- ggdraw(insert_xaxis_grob(non_main_plot, pimage, position = "bottom"))
+
+ncast_plot
+```
+
+Adrian has appeared in the most episodes just beating out Kevin. This really shows how involved Adrian was in the story in Season 4 and 5 especially compared to Kevin who has periodically appeared since the first season.
+
+Everybody's favorite DOUG JUDY rounds off this bar chart.
+
+![doug judy singing gif]()
+![doug judy New york's finest gif]()
+
+```{r fig.height = 6, fig.width = 10, eval=FALSE, echo=FALSE}
 non_main_plot <- non_main_cast %>% 
   arrange(desc(episode_num)) %>% 
   head(5) %>% 
@@ -326,15 +332,9 @@ ncast_plot <- ggdraw(insert_xaxis_grob(non_main_plot, pimage, position = "bottom
 ncast_plot
 ```
 
-Adrian has appeared in the most episodes just beating out Kevin. This really shows how involved Adrian was in the story in Season 4 and 5 especially compared to Kevin who has periodically appeared since the first season.
-
-Everybody's favorite DOUG JUDY rounds off this bar chart.
-
-![doug judy singing gif]()
-
-
-
 # Viewer numbers
+
+Pretty much the same M.O. as what I did to get the episode ratings here. One thing of note was using regex to get rid of the footnotes, I had to be extra careful to double escape the square brackets.
 
 ```{r}
 url_wiki_df <- tibble(
@@ -374,20 +374,21 @@ b99_ep_info_df <- readRDS("../data/b99_ep_info_df.RDS")
 
 - use `separate_rows()` for writers and directors?
 
+# tidylog demo?
 
-```{r}
+a little intermission here as I wanted to talk about this cool package i recently found on Twitter called "tidylogs"
+
+```{r, eval=FALSE, echo=FALSE}
 b99_ep_info_df %>% 
   select(season, num_season, title, num_overall, writer, viewers) %>% 
   separate_rows(writer, sep = "&") %>% 
   mutate(writer = writer %>% trimws) %>% 
-  #select(writer) %>% unique() %>% 
   group_by(writer) %>% 
   summarize(n = n()) %>% 
   arrange(desc(n))
-  #add_count(writer)
 ```
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 b99_ep_info_df %>% 
   select(season, num_season, title, num_overall, director, viewers) %>% 
   separate_rows(director, sep = "&") %>% 
@@ -396,10 +397,15 @@ b99_ep_info_df %>%
   summarize(n = n(),
             avg_viewers = mean(viewers)) %>% 
   arrange(desc(avg_viewers))
+
+# yellow: #FCF40E
+# dark grey: #3A3533
+# light teal: #6CA9C3
+# black: #0F0E0E
+# navy: #175E78
 ```
 
-
-## viewers plot
+## Viewers Plot
 
 - The Fugitive episodes are formatted differently... WHYYYY.gif
 - there are other multi-part episodes but this is the only one that aired on the same day on New Years Day 2017
@@ -409,7 +415,7 @@ At the end I create a `first` and `last` variable for each season taking note of
 ```{r fig.height = 4, fig.width = 10}
 viewers_df <- b99_ep_info_df %>% 
   select(season, num_season, title, num_overall, viewers) %>% 
-  # manually fix The Fugitive episodes
+  # manually fix "The Fugitive" episodes
   filter(num_overall != 7980) %>% 
   add_row(season = 4, num_season = 11, title = "The Fugitive: Part 1", 
           num_overall = 79, viewers = 3.49) %>% 
@@ -426,11 +432,6 @@ viewers_df <- b99_ep_info_df %>%
 
 cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
           "3" = "#000E33", "4" = "#CBCFD2", "5" = "#175E78")
-# yellow: #FCF40E
-# dark grey: #3A3533
-# light teal: #6CA9C3
-# black: #0F0E0E
-# navy: #175E78
 ```
 
 I use `geom_rect()` here to give a colored background for each season. Setting the span of the Xs as the first and last of each season and then using Inf and -Inf for the Ys to cover the entire height of the plot.
@@ -570,10 +571,6 @@ rect <- data.frame(id = as.factor(c(1, 1, 1, 1,
                          12, 12, 5.1,  4.9),
                    y = c(5.1, 2, 0.4,  3.5,
                          2.3, 0.95, 0,  1.3))
-
-# rect2 <- data.frame(id = c(1, 1, 1, 1),
-#                    x = c(12, 12, 5.1,  4.9),
-#                    y = c(2.3, 0.95, 0,  1.3))
 
 header <- ggplot(data = rect, aes(x, y, group = id, fill = id)) +
   geom_polygon() +
