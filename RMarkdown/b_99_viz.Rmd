@@ -131,7 +131,7 @@ glimpse(ep_rating_df)
 
 OK, looks good.
 
-## Episode Ratings Plot
+## Episode Ratings Plot: Heatmap and boxplot
 
 I used `geom_tile()` to create a heatmap of episode ratings with the season number as the rows and the episode number for that season as the columns. I used the `dichromat` package for the color scheme "LightBluetoDarkBlue.10", it meshes pretty well with the Brooklyn 99 color theme!
 
@@ -188,6 +188,33 @@ rating_plot2 <- ep_rating_df %>%
 
 rating_plot2
 ```
+
+Another way to visualize this would be the boxplot
+
+this way allows you to make a comparison between seasons whereas the heatmap could be used to pick out what exact episodes in particular had high/low values (although it can be said that you could do this too with a interactive boxplot where you can hover over the individual points and see info).
+
+I can combine the best of both worlds and put the bee swarm points on top of the box plots!
+
+```{r}
+cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
+          "3" = "#000E33", "4" = "#CBCFD2", "5" = "#175E78")
+
+ep_rating_df %>% 
+  ggplot(aes(season, value, group = season)) +
+  geom_boxplot(color = "#F9FEFF", fill = "#000E33") +
+  ggbeeswarm::geom_beeswarm(color = "#FCF40E", cex = 2, size = 2) +
+  scale_y_continuous(limits = c(7.5, 9.6),
+                     labels = c(7.5, 8, 8.5, 9, 9.5)) +
+  labs(title = "Episode Ratings by Season",
+       x = "Season", y = "Rating") +
+  theme_b99() +
+  theme(panel.grid.minor = element_blank())
+```
+
+
+![the statistical analysis gif]()
+
+well OK they're just box plots Holt is being uncharacteristically melodramatic but I wanted to use thig GIF in some capacity! 
 
 # Cast appearances
 
@@ -575,7 +602,6 @@ rect <- data.frame(id = as.factor(c(1, 1, 1, 1,
 header <- ggplot(data = rect, aes(x, y, group = id, fill = id)) +
   geom_polygon() +
   scale_fill_manual(values = c("#0053CD", "#000E33"), guide = FALSE) +
-  #geom_polygon(data = rect2, aes(x, y, group = id), fill = "#000E33") +
   annotate(geom = "text", y = 2, x = 0.4, hjust = 0,
            family = "Univers LT 93 ExtraBlackEx", 
            color = "#fcf7e8", size = 35, angle = 7.5,
@@ -596,7 +622,7 @@ header <- ggplot(data = rect, aes(x, y, group = id, fill = id)) +
 header
 ```
 
-
+NOICE TOIT
 
 # composition
 
@@ -622,6 +648,8 @@ grid.arrange(
                         c(3, 3, 3, 3, 3))
 )
 ```
+
+![bingpot! gif]()
 
 ## patchwork
 
