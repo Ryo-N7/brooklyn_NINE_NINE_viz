@@ -193,7 +193,7 @@ Another way to visualize this would be the boxplot
 
 this way allows you to make a comparison between seasons whereas the heatmap could be used to pick out what exact episodes in particular had high/low values (although it can be said that you could do this too with a interactive boxplot where you can hover over the individual points and see info).
 
-I can combine the best of both worlds and put the bee swarm points on top of the box plots!
+I can combine the best of both worlds and put the bee swarm points on top of the box plots with the [ggbeeswarm](https://github.com/eclarke/ggbeeswarm) package!
 
 ```{r}
 cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
@@ -201,8 +201,8 @@ cols <- c("1" = "#6CA9C3", "2" = "#3A3533",
 
 ep_rating_df %>% 
   ggplot(aes(season, value, group = season)) +
-  geom_boxplot(color = "#F9FEFF", fill = "#000E33") +
-  ggbeeswarm::geom_beeswarm(color = "#FCF40E", cex = 2, size = 2) +
+  geom_boxplot(color = "#F9FEFF", fill = "#000E33") + 
+  ggbeeswarm::geom_beeswarm(color = "#FCF40E", cex = 2, size = 2.25) +
   scale_y_continuous(limits = c(7.5, 9.6),
                      labels = c(7.5, 8, 8.5, 9, 9.5)) +
   labs(title = "Episode Ratings by Season",
@@ -223,6 +223,7 @@ The main cast of B99 are pretty tightly knit and as members of the same precinct
 Finally I `anti_join()` the main cast list from the full cast list so I am left with the non-main cast and the number of episodes taht they appeared in.
 
 ```{r}
+# Entire cast:
 cast_url <- bow("https://www.imdb.com/title/tt2467372/fullcredits?ref_=tt_cl_sm#cast")
 
 cast_info_raw <- scrape(cast_url) %>% 
@@ -245,7 +246,7 @@ cast_info_clean <- cast_info_raw %>%
     name == "Deputy Chief Madeline Wuntch" ~ "Madeline Wuntch",
     TRUE ~ name))
   
-# MAIN cast
+# Main cast:
 cast_main_url <- bow("https://en.wikipedia.org/wiki/List_of_Brooklyn_Nine-Nine_characters")
 
 cast_main_raw <- scrape(cast_main_url) %>% 
@@ -361,7 +362,7 @@ ncast_plot
 
 # Viewer numbers
 
-Pretty much the same M.O. as what I did to get the episode ratings here. One thing of note was using regex to get rid of the footnotes, I had to be extra careful to double escape the square brackets.
+Pretty much the same M.O. as what I did to get the episode ratings here. One thing of note was using regex to get rid of the footnotes. I had to be careful to double escape the square brackets there.
 
 ```{r}
 url_wiki_df <- tibble(
@@ -390,33 +391,41 @@ brooklyn99_ep_info <- function(url) {
   
 }
 
-b99_ep_info_df <- map2(.x = url_wiki_df$urls, .y = url_wiki_df$season_num,
+ep_info_df <- map2(.x = url_wiki_df$urls, .y = url_wiki_df$season_num,
                           ~ brooklyn99_ep_info(url = .x) %>% 
          mutate(season = .y)) %>% 
   reduce(rbind)
 
-# saveRDS(b99_ep_info_df, "../data/b99_ep_info_df.RDS")
-b99_ep_info_df <- readRDS("../data/b99_ep_info_df.RDS")
+# saveRDS(ep_info_df, "../data/ep_info_df.RDS")
+ep_info_df <- readRDS("../data/ep_info_df.RDS")
+
+glimpse(ep_info_df)
 ```
 
-- use `separate_rows()` for writers and directors?
+## tidylog demo
 
-# tidylog demo?
-
-a little intermission here as I wanted to talk about this cool package i recently found on Twitter called "tidylogs"
+A little intermission here as I wanted to talk about this cool package I recently found on Twitter called [tidylog](https://github.com/elbersb/tidylog). To show you an example, I will take a look at which writers wrote the most episodes in Season 5:
 
 ```{r, eval=FALSE, echo=FALSE}
-b99_ep_info_df %>% 
+library(tidylog)
+
+ep_info_df %>% 
   select(season, num_season, title, num_overall, writer, viewers) %>% 
+  filter(season == 5) %>% 
   separate_rows(writer, sep = "&") %>% 
   mutate(writer = writer %>% trimws) %>% 
   group_by(writer) %>% 
   summarize(n = n()) %>% 
   arrange(desc(n))
+
+# Turn tidylog off:
+options("tidylog.display" = list())
 ```
 
+You can see that it gives you details on what each `dplyr` function changed in your dataframe in the order that the operations were performed. It's pretty cool and it gets more useful as your `dplyr` pipeline grows longer!
+
 ```{r, eval=FALSE, echo=FALSE}
-b99_ep_info_df %>% 
+ep_info_df %>% 
   select(season, num_season, title, num_overall, director, viewers) %>% 
   separate_rows(director, sep = "&") %>% 
   mutate(director = director %>% trimws) %>% 
@@ -434,13 +443,18 @@ b99_ep_info_df %>%
 
 ## Viewers Plot
 
-- The Fugitive episodes are formatted differently... WHYYYY.gif
-- there are other multi-part episodes but this is the only one that aired on the same day on New Years Day 2017
+The episode info dataframe we got from Wikipedia had a lot of different information so let's chop it down a bit to get a dataframe on the number of viewers per episode.
 
-At the end I create a `first` and `last` variable for each season taking note of what overall number the first and last episodes of a season were. You'll see why I did this soon.
+From what we saw from `glimpse()`-ing the `ep_info_df` earlier the data looked pretty clean already... except for "The Fugitive" episodes being formatted differently... 
+
+WHYYYY.gif
+
+There are other multi-part episodes throughout the show but this pair is the only one that aired on the same day, on New Years Day 2017 so they got smushed together in the Wikipedia table when we scraped it. There wasn't a quick and easy way to `regex` them into separate rows so I just filtered them out and added them back in.
+
+Then at the end of the pipe, I create a `first` and `last` variable for each season taking note of what overall episode number the first and last episodes of each season were. You'll see why I did this soon.
 
 ```{r fig.height = 4, fig.width = 10}
-viewers_df <- b99_ep_info_df %>% 
+viewers_df <- ep_info_df %>% 
   select(season, num_season, title, num_overall, viewers) %>% 
   # manually fix "The Fugitive" episodes
   filter(num_overall != 7980) %>% 
@@ -456,16 +470,101 @@ viewers_df <- b99_ep_info_df %>%
   mutate(first = first(num_overall),
          last = last(num_overall)) %>% 
   ungroup() 
-
-cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
-          "3" = "#000E33", "4" = "#CBCFD2", "5" = "#175E78")
 ```
 
-I use `geom_rect()` here to give a colored background for each season. Setting the span of the Xs as the first and last of each season and then using Inf and -Inf for the Ys to cover the entire height of the plot.
+For this plot I use `geom_rect()` to give a colored background for each season. Setting the span of the Xs as the `first` and `last` episode number of each season and then using `Inf` and `-Inf` for the Ys to cover the entire height of the plot.
 
-For the season labels i calculated the midpoint along the x-axis per each season and used that as the x values (not shown in the code). I could have used facets but to the best of my knowledge I wouldn't have been able to place the labels on top across multiple facets anyways. Probably possible by placing text grobs on top of the facetted plot but I thought that would take more time compared to what I did with `geom_rect()`.
+For the season labels I calculated the midpoint along the x-axis forr each season and used that as the x values (not shown in the code). I could have used facets but to the best of my knowledge I wouldn't have been able to place the labels on top across multiple facets anyways. It may be possible by placing text grobs on top of the facetted plot but I thought that would take more time compared to what I did with `geom_rect()`. Otherwise I use a lot of `annotate()` code to add in the episode details and season titles.
 
 ```{r fig.height = 6, fig.width = 11}
+# fig.height=12, fig.width=16
+
+# Color hex codes for season blocks:
+cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
+          "3" = "#000E33", "4" = "#CBCFD2", "5" = "#175E78")
+
+viewer_plot <- viewers_df %>% 
+  ggplot(aes(x = num_overall, y = viewers, group = season)) +
+  geom_rect(aes(xmin = first, xmax = last,
+                fill = season), alpha = 0.2,
+            ymin = -Inf, ymax = Inf) +
+  geom_line(color = "white", size = 1.1) +
+  scale_fill_manual("Season", values = cols, guide = FALSE) +
+  scale_y_continuous(limits = c(0, 20),
+                     breaks = c(seq(0, 15, by = 5)),
+                     expand = c(0, 0)) +
+  scale_x_continuous(breaks = c(seq(0, 112, by = 5)),
+                     labels = c(seq(0, 112, by = 5)),
+                     expand = c(0, 0)) +
+  labs(x = "Episode Number (Overall)", y = "Viewers (Millions)",
+       title = "Viewers by Episode") +
+  theme_b99() +
+  theme(panel.grid = element_blank()) +
+  # Line segments
+  annotate(geom = "segment", x = 15, xend = 15, y = 15, yend = 16., 
+           color = "black", size = 1.2) +
+  annotate(geom = "segment", x = 34, xend = 34, y = 6, yend = 7, 
+           color = "black", size = 1.2) +
+  annotate(geom = "segment", x = 79.5, xend = 79.5, y = 3.5, yend = 5, 
+           color = "black", size = 1.2) +
+  # Episode details
+  annotate(geom = "label", x = 7, y = 16.5, hjust = 0, size = 4.5,
+           family = "Univers",
+           label = "Operation: Broken Feather (Aired after Super Bowl XLVIII)") +
+  annotate(geom = "label", x = 25, y = 7.5, hjust = 0, size = 4.5, 
+           family = "Univers",
+           label = "Beach House (Sunday before First Workday of 2015)") +
+  annotate(geom = "label", x = 67, y = 5, hjust = 0, size = 4.5,
+           family = "Univers",
+           label = "The Fugitive: Part 1 & 2 (New Years Day 2017)") +
+  # Season titles
+  annotate(geom = "label", x = 11.5, y = 19, size = 7,
+           family = "Univers",
+           label = "Season One") +
+  annotate(geom = "label", x = 34, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Two") +
+  annotate(geom = "label", x = 57, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Three") +
+  annotate(geom = "label", x = 79.5, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Four") +
+  annotate(geom = "label", x = 102, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Five") 
+
+viewer_plot
+```
+
+I added in details on why certain episodes had such high viewership compared to others from both my memory and a little digging but I wasn't really sure about those three peaks in Season 3. One of them was a **Halloween** episode which is up there with the **Pontiac Bandit** episodes for the best recurring episodes but in terms of the actual airing dates I can't quite remember anything significant happening on those days that would explain the high viewer numbers (relative to the other episodes in the season).
+
+With the presence of some outliers (notably the post-Super Bowl episode) it's probably better to look at the median rather than the mean.
+
+```{r}
+viewers_df %>% 
+  group_by(season) %>% 
+  summarize(avg_viewers = median(viewers))
+
+viewers_df %>% summarize(med = median(viewers))
+
+viewers_df %>% 
+  group_by(season) %>% 
+  summarize(avg_viewers = mean(viewers))
+
+viewers_df %>% summarize(med = mean(viewers))
+```
+
+
+Throughout it's run on FOX the show averaged around 2-3.4 million viewers with numerous peaks and troughs until the 5th season where it only averaged around 1.8 million viewers but kept those numbers very consistently across the entire season. Due to that consistency you can see that the mean and median values are pretty similar to each other.
+
+```{r fig.height = 6, fig.width = 11, eval=FALSE, echo=FALSE}
+# fig.height=12, fig.width=16
+
+# Color hex codes for season blocks:
+cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
+          "3" = "#000E33", "4" = "#CBCFD2", "5" = "#175E78")
+
 viewer_plot <- viewers_df %>% 
   ggplot(aes(x = num_overall, y = viewers, group = season)) +
   geom_rect(aes(xmin = first, xmax = last,
@@ -523,10 +622,6 @@ viewer_plot <- viewers_df %>%
 viewer_plot
 ```
 
-not sure about the Season 3 episodes
-
-although one of them was a Halloween episode which fights with the Pontiac Bandit for best recurring episode
-but in terms of the actual dates that those episodes aired I can't quite remember anything significant happening.
 
 
 # colors & fonts
@@ -591,6 +686,7 @@ ggplot(mtcars, aes(x = mpg, y = vs)) +
 
 ```{r fig.width = 12, fig.height = 5.5}
 #library(shadowtext)
+# fig.height=12, fig.width=16
 
 rect <- data.frame(id = as.factor(c(1, 1, 1, 1,
                           2, 2, 2, 2)),
@@ -616,7 +712,7 @@ header <- ggplot(data = rect, aes(x, y, group = id, fill = id)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 5.5)) +
   theme_void() +
   theme(plot.background = element_rect(color = "#F9FEFF", 
-                                       fill = "#F9FEFF", # "#1A5E1FFF" "#CCFFBB"
+                                       fill = "#F9FEFF", 
                                        size = 8))
 
 header
