@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 "Hey there criminal. It's me, Johnny Law!" - Jake Peralta, NYPD.
 
-Brooklyn Nine-Nine has become one of my favorite sitcoms in recent years, probably taking over from Parks & Recreation. So in this blog post, I'm going to webscrape some very simple statistics, tidy it up with the `tidyverse`, and visualize it with `ggplot2`. 
+Brooklyn Nine-Nine has become one of my favorite sitcoms in recent years, probably taking over from Parks & Recreation. So in this blog post, I'm going to web scrape some very simple statistics, clean it up with the `tidyverse`, and visualize it with `ggplot2`... 
 
 "Terry loves `ggplot2`!"
 
@@ -62,6 +62,10 @@ theme_b99 <- function(){
                                            linetype = "solid"))
 }
 ```
+
+Now the plots will all look very similar.
+
+![](https://media3.giphy.com/media/3oxHQoyto7T8wBjUJ2/giphy.gif)
 
 With that done, I can start making plots!
 
@@ -216,13 +220,9 @@ ep_rating_df %>%
   theme(panel.grid.minor = element_blank())
 ```
 
-The stand-out episodes are...
+Toit! We get the best of both worlds by combining two different types of visualizing distributions. Let's check out what the stand-out episodes are...
 
 ```{r}
-ep_rating_df %>% 
-  group_by(season) %>% 
-  slice(which.max(rating))
-
 ep_rating_df %>% 
   group_by(season) %>% 
   top_n(n = 2, wt = rating) %>% 
@@ -254,7 +254,7 @@ ep_rating_df2 %>%
   theme(panel.grid.minor = element_blank())
 ```
 
-![the statistical analysis gif]()
+![the statistical analysis gif](https://media.giphy.com/media/8PQOq6nMYO0kU/giphy.gif)
 
 Well OK, they're just box plots but I wanted to use this GIF in some capacity! 
 
@@ -356,8 +356,7 @@ ncast_plot
 
 Adrian has appeared in the most episodes just beating out Kevin. This really shows how involved Adrian was in the story in Season 4 and 5 especially compared to Kevin who has periodically appeared since the first season. Everybody's favorite DOUG JUDY rounds off this bar chart.
 
-![doug judy singing gif]()
-![doug judy New york's finest gif]()
+![doug judy New york's finest gif](https://66.media.tumblr.com/87972a8335ae460091c2005ff519f009/tumblr_omcy241y071w4nkyqo4_400.gif)
 
 ```{r fig.height = 6, fig.width = 10, eval=FALSE, echo=FALSE}
 non_main_plot <- non_main_cast %>% 
@@ -457,12 +456,14 @@ ep_info_df %>%
   group_by(writer) %>% 
   summarize(n = n()) %>% 
   arrange(desc(n))
+```
 
-# Turn tidylog off:
+You can see that it gives you details on what each `dplyr` function changed in your dataframe in the order that the operations were performed. It's pretty cool and it gets more useful as your `dplyr` pipeline grows longer! Let's turn tidylog off for now:
+
+```{r}
 options("tidylog.display" = list())
 ```
 
-You can see that it gives you details on what each `dplyr` function changed in your dataframe in the order that the operations were performed. It's pretty cool and it gets more useful as your `dplyr` pipeline grows longer!
 
 ```{r, eval=FALSE, echo=FALSE}
 ep_info_df %>% 
@@ -487,7 +488,7 @@ The episode info dataframe we got from Wikipedia had a lot of different informat
 
 From what we saw from `glimpse()`-ing the `ep_info_df` earlier the data looked pretty clean already... except for "The Fugitive" episodes being formatted differently... 
 
-WHYYYY.gif
+![WHYYYY.gif](https://66.media.tumblr.com/cc01463acbe445711497b5c979b996d1/tumblr_ov5bc3udjC1ty7lb2o1_540.gif) 
 
 There are other multi-part episodes throughout the show but this pair is the only one that aired on the same day, on New Years Day 2017 so they got smushed together in the Wikipedia table when we scraped it. There wasn't a quick and easy way to `regex` them into separate rows so I just filtered them out and added them back in.
 
@@ -595,7 +596,6 @@ viewers_df %>%
 viewers_df %>% summarize(med = mean(viewers))
 ```
 
-
 Throughout it's run on FOX the show averaged around 2-3.4 million viewers with numerous peaks and troughs until the 5th season where it only averaged around 1.8 million viewers but kept those numbers very consistently across the entire season. Due to that consistency you can see that the mean and median values are pretty similar to each other.
 
 ```{r fig.height = 6, fig.width = 11, eval=FALSE, echo=FALSE}
@@ -664,12 +664,13 @@ viewer_plot
 
 
 
+```{r message=FALSE}
 # colors & fonts
+# 
+# - dichromat: lightbluetodarkblue.10
+# -RColorBrewer: Blues
 
-- dichromat: lightbluetodarkblue.10
--RColorBrewer: Blues
-
-```{r}
+#loadfonts(device = "win")
 # yellow: #FCF40E
 # dark grey: #3A3533
 # light teal: #6CA9C3
@@ -679,12 +680,6 @@ viewer_plot
 # grey: #CBCFD2
 # white: #F9FEFF
 # blue: #0053CD
-
-
-```
-
-```{r message=FALSE}
-#loadfonts(device = "win")
 
 ggplot(mtcars, aes(x = mpg, y = vs)) +
   geom_point(size = 2.5) +
@@ -718,11 +713,9 @@ ggplot(mtcars, aes(x = mpg, y = vs)) +
 ```
 
 
-# text boxes etc.
+# Creating the title card
 
-```{r}
-
-```
+The last thing I want to do to wrap this blog post up is to create an infographic containing the plots I made above. Before I combine them all I want to make a title card that looks as similar to the official Brooklyn Nine Nine title card you see at the beginning of the episode. I used `geom_polygon()` to construct the two diagonal colored bars and then placed the text on top of them. 
 
 ```{r fig.width = 12, fig.height = 5.5}
 #library(shadowtext)
@@ -760,7 +753,7 @@ header
 
 NOICE TOIT
 
-# composition
+![]()
 
 ```{r}
 ?cowplot::plot_grid()
@@ -768,7 +761,9 @@ grid::textGrob()
 grid::circleGrob()
 ```
 
-## grid
+## Arrange plots with grid
+
+Now for the coup-de-grace, arranging all of the plots and the title card together to create a Brooklyn Nine Nine infographic!
 
 ```{r fig.height=12, fig.width=16}
 grid.arrange(
@@ -785,7 +780,25 @@ grid.arrange(
 )
 ```
 
-![bingpot! gif]()
+![yay](https://media2.giphy.com/media/l4JySAWfMaY7w88sU/source.gif)
+
+
+# Conclusion
+
+In this blog post I went over creating your own custom `ggplot2` theme, web scraping, cleaning and tidying dataframes with the `tidyverse`, and creating a variety of plots to show simple statistics on Brooklyn Nine Nine. To conclude I just wanted to list out my top five "Cold Opens" (in no particular order):
+
+- Halloween: Boyle == Denis Stojko
+- THE FULL BULL PEN
+- HOT DAMN! ![]()
+- Holt wearing a red hat to work.
+- "I came down with a Dianne Weast infection..."
+
+Agree? Disagree? Let me know in the comments below!
+
+I hope you had as much fun reading this as I did making it. If you didn't, then well...
+
+![yaboring](https://66.media.tumblr.com/c0584c949c88744289b97aecd7186eba/tumblr_osdftshJze1ukq7ljo4_400.gif)
+
 
 ## patchwork
 
