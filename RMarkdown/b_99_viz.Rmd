@@ -22,7 +22,7 @@ Brooklyn Nine-Nine has become one of my favorite sitcoms in recent years, probab
 # Packages
 
 ```{r warning=FALSE, message=FALSE}
-pacman::p_load(tidyverse, rvest, glue, cowplot,
+pacman::p_load(tidyverse, rvest, glue, cowplot, ggbeeswarm,
                polite, extrafont, scales, gridExtra)
 loadfonts() # "Univers" and "Univers LT 93 ExtraBlackEx" fonts
 ```
@@ -100,7 +100,8 @@ brooklyn99_ep_rating <- function(url) {
     html_nodes(".ipl-rating-widget > .ipl-rating-star .ipl-rating-star__rating") %>% 
     html_text() %>% 
     as_tibble() %>%  
-    mutate(value = gsub("\\n", "", x = value) %>% as.numeric)
+    mutate(rating = gsub("\\n", "", x = value) %>% as.numeric) %>% 
+    select(-value)
   
   # Clean episode name df
   sX_ep_name <- sX_ep_name %>% 
@@ -118,7 +119,7 @@ ep_rating_df <- map2(.x = url_df$urls, .y = url_df$season_num,
          mutate(season = .y)) %>% 
   reduce(bind_rows)
 
-#saveRDS(ep_rating_df, "../data/ep_rating_df.RDS")
+saveRDS(ep_rating_df, "../data/ep_rating_df.RDS")
 ep_rating_df <- readRDS("../data/ep_rating_df.RDS")
 
 ep_rating_df <- ep_rating_df %>% 
@@ -138,7 +139,7 @@ I used `geom_tile()` to create a heatmap of episode ratings with the season numb
 ```{r fig.height=5, fig.width=7}
 rating_plot <- ep_rating_df %>% 
   ggplot(aes(x = ep_num, y = season)) +
-  geom_tile(aes(fill = value), size = 1.5,
+  geom_tile(aes(fill = rating), size = 1.5,
             color = "black") +
   scale_fill_gradientn("Rating", colors = dichromat::colorschemes$LightBluetoDarkBlue.10,
                        breaks = c(7.7, 8, 8.5, 9, 9.5)) +
@@ -166,7 +167,7 @@ rating_plot2 <- ep_rating_df %>%
   mutate(ep_num = row_number()) %>% 
   ungroup() %>% 
   ggplot(aes(x = ep_num, y = season)) +
-  geom_tile(aes(fill = value), size = 1.5,
+  geom_tile(aes(fill = rating), size = 1.5,
             color = "black") +
   scale_fill_gradientn("Rating", colors = dichromat::colorschemes$LightBluetoDarkBlue.10,
                        breaks = c(7.7, 8, 8.5, 9, 9.5)) +
@@ -189,20 +190,24 @@ rating_plot2 <- ep_rating_df %>%
 rating_plot2
 ```
 
-Another way to visualize this would be the boxplot
+Another way to visualize this would be the boxplot. This way allows you to make a comparison between seasons, whereas the heatmap could be used to pick out any trends over time or sequence.
 
-this way allows you to make a comparison between seasons whereas the heatmap could be used to pick out what exact episodes in particular had high/low values (although it can be said that you could do this too with a interactive boxplot where you can hover over the individual points and see info).
+The debate between violin plot vs. box plot vs. sina plot vs. etc. rages on to this day (some examples I've read over the years: [1](https://cerebralmastication.com/2009/02/box-plot-vs-violin-plot-in-r/), [2](https://simplystatistics.org/2017/07/13/the-joy-of-no-more-violin-plots/), [3](https://rpubs.com/crazyhottommy/sina-plot)) and some of the arguments made seem to come down to personal preference. The data I'm using is quite small (~20 episode ratings for each season) so in my case it might be better to use boxplots (instead of violin plots) and sprinkle bee swarm points on top with the [ggbeeswarm](https://github.com/eclarke/ggbeeswarm) package! I commented out some of the other methods if you wanted to copy-paste this code chunk into your R console to try them out.
 
-I can combine the best of both worlds and put the bee swarm points on top of the box plots with the [ggbeeswarm](https://github.com/eclarke/ggbeeswarm) package!
+I highlighted the outliers for each season in red with the unintentional result being that the color scheme mimics that of the flag of Colorado...
 
-```{r}
+```{r fig.height=5, fig.width=7}
 cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
           "3" = "#000E33", "4" = "#CBCFD2", "5" = "#175E78")
 
 ep_rating_df %>% 
-  ggplot(aes(season, value, group = season)) +
-  geom_boxplot(color = "#F9FEFF", fill = "#000E33") + 
-  ggbeeswarm::geom_beeswarm(color = "#FCF40E", cex = 2, size = 2.25) +
+  ggplot(aes(x = season, y = rating, group = season)) +
+  #geom_violin(color = "#F9FEFF", fill = "#000E33") +
+  #ggthemes::geom_tufteboxplot(color = "#F9FEFF", fill = "#000E33") +
+  #ggforce::geom_sina(color = "#F9FEFF", fill = "#000E33") +
+  geom_boxplot(color = "#F9FEFF", fill = "#000E33",
+              outlier.color = "red", outlier.size = 5) +
+  geom_beeswarm(color = "#FCF40E", cex = 2, size = 2.25) +
   scale_y_continuous(limits = c(7.5, 9.6),
                      labels = c(7.5, 8, 8.5, 9, 9.5)) +
   labs(title = "Episode Ratings by Season",
@@ -211,10 +216,47 @@ ep_rating_df %>%
   theme(panel.grid.minor = element_blank())
 ```
 
+The stand-out episodes are...
+
+```{r}
+ep_rating_df %>% 
+  group_by(season) %>% 
+  slice(which.max(rating))
+
+ep_rating_df %>% 
+  group_by(season) %>% 
+  top_n(n = 2, wt = rating) %>% 
+  arrange(season, desc(rating))
+```
+
+Mostly end-of-season episodes just like what we saw in the heatmap.
+
+It is very clear that the Halloween episodes are highly regarded (to those that rate B99 on IMDB).
+
+![](https://78.media.tumblr.com/5fd58d43ff6eeb965c9d623d783f31eb/tumblr_oy44wkivKi1vj8gn9o1_540.gif)
+
+A more recent variant for showing a distribution is the ridgeline plot (using the [ggridges]() package):
+
+```{r fig.height=5, fig.width=7}
+ep_rating_df %>% 
+  mutate(season = as_factor(as.character(season))) -> ep_rating_df2
+
+ep_rating_df2 %>% 
+  ggplot(aes(x = rating, y = season, height = ..density..)) +
+  ggridges::geom_density_ridges(color = "#F9FEFF", fill = "#000E33") +
+  labs(title = "Episode Ratings by Season",
+       x = "Rating", y = "Season") +
+  scale_x_continuous(limits = c(7.25, 9.8),
+                     breaks = c(7.5, 8, 8.5, 9, 9.5),
+                     labels = c(7.5, 8, 8.5, 9, 9.5)) +
+  scale_y_discrete(limits = rev(levels(ep_rating_df2$season))) +
+  theme_b99() +
+  theme(panel.grid.minor = element_blank())
+```
 
 ![the statistical analysis gif]()
 
-well OK they're just box plots Holt is being uncharacteristically melodramatic but I wanted to use thig GIF in some capacity! 
+Well OK, they're just box plots but I wanted to use this GIF in some capacity! 
 
 # Cast appearances
 
@@ -312,9 +354,7 @@ ncast_plot <- ggdraw(insert_xaxis_grob(non_main_plot, pimage, position = "bottom
 ncast_plot
 ```
 
-Adrian has appeared in the most episodes just beating out Kevin. This really shows how involved Adrian was in the story in Season 4 and 5 especially compared to Kevin who has periodically appeared since the first season.
-
-Everybody's favorite DOUG JUDY rounds off this bar chart.
+Adrian has appeared in the most episodes just beating out Kevin. This really shows how involved Adrian was in the story in Season 4 and 5 especially compared to Kevin who has periodically appeared since the first season. Everybody's favorite DOUG JUDY rounds off this bar chart.
 
 ![doug judy singing gif]()
 ![doug judy New york's finest gif]()
