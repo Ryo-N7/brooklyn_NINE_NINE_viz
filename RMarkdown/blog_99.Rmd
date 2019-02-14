@@ -15,10 +15,6 @@ Brooklyn Nine-Nine has become one of my favorite sitcoms in recent years, probab
 
 "Terry loves `ggplot2`!"
 
-- yippie-kayak other buckets!
-- Noice. Toit.
-- fine i was trying something and it didn't work! .gif
-
 # Packages
 
 ```{r warning=FALSE, message=FALSE}
@@ -123,9 +119,6 @@ ep_rating_df <- map2(.x = url_df$urls, .y = url_df$season_num,
          mutate(season = .y)) %>% 
   reduce(bind_rows)
 
-#saveRDS(ep_rating_df, "../data/ep_rating_df.RDS")
-ep_rating_df <- readRDS("../data/ep_rating_df.RDS")
-
 ep_rating_df <- ep_rating_df %>% 
   group_by(season) %>% 
   mutate(ep_num = row_number()) %>% 
@@ -163,11 +156,11 @@ rating_plot <- ep_rating_df %>%
 rating_plot
 ```
 
-From what we can see on the graph there doesn't seem to be any trends along either axes besides the fact that the finales and the subsequent opening episode of the following season are well-received. The two stand out episodes that can be clearly seen are from Season 5. These episodes are "" with  and ""  . 
+From what we can see on the graph there doesn't seem to be any trends along either axes besides the fact that the finales and the subsequent opening episode of the following season are well-received. The two stand out episodes can be clearly seen from Season 5. These episodes are "HalloVeen" (the fifth Halloween episode of the series)  and "The Box" (featuring Sterling K. Brown as the perp). 
 
 Another way to visualize this would be the box plot. This way allows you to make a comparison between seasons, whereas the heat map could be used to pick out any trends over time or sequence.
 
-The debate between violin plot vs. box plot vs. sina plot vs. etc. rages on to this day (some examples I've read over the years: [1](https://cerebralmastication.com/2009/02/box-plot-vs-violin-plot-in-r/), [2](https://simplystatistics.org/2017/07/13/the-joy-of-no-more-violin-plots/), [3](https://rpubs.com/crazyhottommy/sina-plot)) and some of the arguments made seem to come down to personal preference. The data I'm using is quite small (~20 episode ratings for each season) so in my case it might be better to use box plots (instead of violin plots) and sprinkle bee swarm points on top with the [ggbeeswarm](https://github.com/eclarke/ggbeeswarm) package! I commented out some of the other methods if you wanted to copy-paste this code chunk into your R console to try them out.
+The debate between violin plot vs. box plot vs. sina plot vs. etc. rages on to this day (some examples I've read over the years: [1](https://cerebralmastication.com/2009/02/box-plot-vs-violin-plot-in-r/), [2](https://simplystatistics.org/2017/07/13/the-joy-of-no-more-violin-plots/), [3](https://rpubs.com/crazyhottommy/sina-plot)) and some of the arguments made seem to come down to personal preference. The data I'm using is quite small (~20 episode ratings for each season) so in my case it might be better to use box plots (instead of violin plots) and sprinkle bee swarm points on top with the [ggbeeswarm](https://github.com/eclarke/ggbeeswarm) package. I commented out some of the other methods if you wanted to copy-paste this code chunk into your R console to try them out!
 
 I highlighted the outliers for each season in red with the unintentional result being that the color scheme mimics that of the flag of Colorado...
 
@@ -175,7 +168,7 @@ I highlighted the outliers for each season in red with the unintentional result 
 cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
           "3" = "#000E33", "4" = "#CBCFD2", "5" = "#175E78")
 
-ep_rating_df %>% 
+box_plot <- ep_rating_df %>% 
   ggplot(aes(x = season, y = rating, group = season)) +
   #geom_violin(color = "#F9FEFF", fill = "#000E33") +
   #ggthemes::geom_tufteboxplot(color = "#F9FEFF", fill = "#000E33") +
@@ -189,28 +182,38 @@ ep_rating_df %>%
        x = "Season", y = "Rating") +
   theme_b99() +
   theme(panel.grid.minor = element_blank())
+
+box_plot
 ```
 
-Toit! We get the best of both worlds by combining two different types of visualizing distributions. Let's check out what the stand-out episodes are...
+Toit! We get the best of both worlds by combining two different types of visualizing distributions. Let's check out which episodes those red dots are...
 
 ```{r}
 ep_rating_df %>% 
   group_by(season) %>% 
-  top_n(n = 2, wt = rating) %>% 
-  arrange(season, desc(rating))
+  mutate(n = n(),
+         third_quantile = quantile(rating)[4]) %>% 
+  filter(rating > third_quantile + 1.58*(IQR(rating))) %>% 
+  select(-n, -third_quantile)
 ```
 
 Mostly end-of-season episodes just like what we saw in the heat map.
+
+Besides the (re)appearances of Doug Judy, Brooklyn Nine-Nine is known for its Halloween Episodes.
+
+```{r}
+
+```
 
 It is very clear that the Halloween episodes are highly regarded (to those that rate B99 on IMDB).
 
 ![](https://78.media.tumblr.com/5fd58d43ff6eeb965c9d623d783f31eb/tumblr_oy44wkivKi1vj8gn9o1_540.gif)
 
-A more recent variant for showing a distribution is the ridge-line plot (using the [ggridges]() package):
+A more recent variant for showing a distribution is the ridge-line plot, courtesy of the [ggridges](https://github.com/clauswilke/ggridges) package:
 
 ```{r fig.height=5, fig.width=7}
-ep_rating_df %>% 
-  mutate(season = as_factor(as.character(season))) -> ep_rating_df2
+ep_rating_df2 <- ep_rating_df2 %>% 
+  mutate(season = as_factor(as.character(season)))
 
 ep_rating_df2 %>% 
   ggplot(aes(x = rating, y = season, height = ..density..)) +
@@ -272,13 +275,6 @@ cast_main_clean <- cast_main_raw %>%
   slice(-1) %>% 
   select(Character)
 
-# save
-#saveRDS(cast_info_clean, "../data/cast_info_clean.RDS")
-cast_info_clean <- readRDS("../data/cast_info_clean.RDS")
-
-#saveRDS(cast_main_clean, "../data/cast_main_clean.RDS")
-cast_main_clean <- readRDS("../data/cast_main_clean.RDS")
-
 # anti-join
 non_main_cast <- anti_join(cast_info_clean, cast_main_clean, by = c("name" = "Character"))
 ```
@@ -301,7 +297,7 @@ non_main_plot <- non_main_cast %>%
   scale_y_continuous(expand = c(0, 0), limits = c(0, 12.5),
                      breaks = c(2, 4, 6, 8, 10, 12),
                      labels = c(2, 4, 6, 8, 10, 12)) +
-  labs(title = "Most appearances by non-main cast", 
+  labs(title = "Most Appearances by Non-Main Cast", 
        x = NULL, y = "Number of Episodes") +
   theme_b99() +
   theme(panel.grid.major.x = element_blank())
@@ -309,15 +305,15 @@ non_main_plot <- non_main_cast %>%
 # images
 pimage <- axis_canvas(non_main_plot, axis = 'x') + 
   draw_image("https://vignette.wikia.nocookie.net/tvdatabase/images/d/d5/Adrian_Pimento.jpg", 
-             x = 0.5, scale = 0.9) +
+             x = 0.5, scale = 1.3, clip = "on") +
   draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/a/ab/Kevin.jpg", 
-             x = 1.5, scale = 0.9) +
+             x = 1.5, scale = 1.3, clip = "on") +
   draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/b/b3/Wuntch.png", 
-             x = 2.5, scale = 0.9) +
+             x = 2.5, scale = 1.3, clip = "on") +
   draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/2/23/Vulture.jpg", 
-             x = 3.5, scale = 0.9) +
+             x = 3.5, scale = 1.3, clip = "on") +
   draw_image("https://vignette.wikia.nocookie.net/brooklynnine-nine/images/0/0a/Doug_Judy.png",
-             x = 4.5, scale = 0.9)
+             x = 4.5, scale = 1.3, clip = "on")
 
 # insert the image strip into the bar plot and draw  
 ncast_plot <- ggdraw(insert_xaxis_grob(non_main_plot, pimage, position = "bottom"))
@@ -365,9 +361,6 @@ ep_info_df <- map2(.x = url_wiki_df$urls, .y = url_wiki_df$season_num,
          mutate(season = .y)) %>% 
   reduce(rbind)
 
-# saveRDS(ep_info_df, "../data/ep_info_df.RDS")
-ep_info_df <- readRDS("../data/ep_info_df.RDS")
-
 glimpse(ep_info_df)
 ```
 
@@ -375,7 +368,7 @@ glimpse(ep_info_df)
 
 A little intermission here as I wanted to talk about this cool package I recently found on Twitter called [tidylog](https://github.com/elbersb/tidylog). To show you an example, I will take a look at which writers wrote the most episodes in Season 5:
 
-```{r, eval=FALSE, echo=FALSE}
+```{r}
 library(tidylog)
 
 ep_info_df %>% 
@@ -430,8 +423,6 @@ For this plot I use `geom_rect()` to give a colored background for each season. 
 For the season labels I calculated the midpoint along the x-axis for each season and used that as the x values (not shown in the code). I could have used facets but to the best of my knowledge I wouldn't have been able to place the labels on top across multiple facets anyways. It may be possible by placing text grobs on top of the facetted plot but I thought that would take more time compared to what I did with `geom_rect()`. Otherwise I use a lot of `annotate()` code to add in the episode details and season titles.
 
 ```{r fig.height = 6, fig.width = 11}
-# fig.height=12, fig.width=16
-
 # Color hex codes for season blocks:
 cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
           "3" = "#000E33", "4" = "#CBCFD2", "5" = "#175E78")
@@ -444,7 +435,7 @@ viewer_plot <- viewers_df %>%
   geom_line(color = "white", size = 1.1) +
   scale_fill_manual("Season", values = cols, guide = FALSE) +
   scale_y_continuous(limits = c(0, 20),
-                     breaks = c(seq(0, 15, by = 5)),
+                     breaks = c(seq(0, 15, by = 2.5)),
                      expand = c(0, 0)) +
   scale_x_continuous(breaks = c(seq(0, 112, by = 5)),
                      labels = c(seq(0, 112, by = 5)),
@@ -490,55 +481,42 @@ viewer_plot <- viewers_df %>%
 viewer_plot
 ```
 
-I added in details on why certain episodes had such high viewership compared to others from both my memory and a little digging but I wasn't really sure about those three peaks in Season 3. One of them was a **Halloween** episode which is up there with the **Pontiac Bandit** episodes for the best recurring episodes but in terms of the actual airing dates I can't quite remember anything significant happening on those days that would explain the high viewer numbers (relative to the other episodes in the season).
+I added in details on why certain episodes had such high viewership compared to others from both my memory and a little digging but I wasn't really sure about those three peaks in Season 3. One of them was a **Halloween** episode (which is up there with the **Pontiac Bandit** episodes for the best recurring episodes), but in terms of the actual airing dates I can't quite remember anything significant happening on those days that would explain the high viewer numbers (relative to the other episodes in the season).
 
-With the presence of some outliers (notably the post-Super Bowl episode) it's probably better to look at the median rather than the mean.
-
-```{r}
-viewers_df %>% 
-  group_by(season) %>% 
-  summarize(avg_viewers = median(viewers))
-
-viewers_df %>% summarize(med = median(viewers))
-
-viewers_df %>% 
-  group_by(season) %>% 
-  summarize(avg_viewers = mean(viewers))
-
-viewers_df %>% summarize(med = mean(viewers))
-```
-
-Throughout it's run on FOX the show averaged around 2-3.4 million viewers with numerous peaks and troughs until the 5th season where it only averaged around 1.8 million viewers but kept those numbers very consistently across the entire season. Due to that consistency you can see that the mean and median values are pretty similar to each other.
+Throughout it's run on FOX, the show averaged around 2~3.5 million viewers with numerous peaks and troughs until the 5th season where it only averaged around 1.8 million viewers but kept those numbers very consistently across the entire season.
 
 # Creating the title card
 
-The last thing I want to do to wrap this blog post up is to create an infographic containing the plots I made above. Before I combine them all I want to make a title card that looks as similar to the official Brooklyn Nine-Nine title card you see at the beginning of the episode. I used `geom_polygon()` to construct the two diagonal colored bars and then placed the text on top of them. 
+The last thing I want to do to wrap this blog post up is to create an infographic containing the plots I made above. Before I combine them all I want to make a title card that looks as similar to the official Brooklyn Nine-Nine title card you see at the beginning of the episode. 
 
-```{r fig.width = 12, fig.height = 5.5}
-#library(shadowtext)
-# fig.height=12, fig.width=16
+Here's what it looks like:
 
+![](https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Brooklyn_nine-nine_logo.png/800px-Brooklyn_nine-nine_logo.png)
+
+Now I could just paste the `URL` for the picture into my graph but why not try making it yourself? So, I used `geom_polygon()` to construct the two diagonal colored bars and then placed the text on top of them with `annotate()`. 
+
+```{r fig.width = 16, fig.height = 5.5}
 rect <- data.frame(id = as.factor(c(1, 1, 1, 1,
                           2, 2, 2, 2)),
-                   x = c(12, 12, 0,  0,
-                         12, 12, 5.1,  4.9),
+                   x = c(16, 16, 0,    0,
+                         16, 16, 6.6,  6.5),
                    y = c(5.1, 2, 0.4,  3.5,
-                         2.3, 0.95, 0,  1.3))
+                         2.5, 0.8, 0,  1.6))
 
 header <- ggplot(data = rect, aes(x, y, group = id, fill = id)) +
   geom_polygon() +
   scale_fill_manual(values = c("#0053CD", "#000E33"), guide = FALSE) +
-  annotate(geom = "text", y = 2, x = 0.4, hjust = 0,
+  annotate(geom = "text", y = 2, x = 1.8, hjust = 0,
            family = "Univers LT 93 ExtraBlackEx", 
-           color = "#fcf7e8", size = 35, angle = 7.5,
+           color = "#fcf7e8", size = 40, angle = 5,
            label = glue("
                         BROOKLYN")) +
-  annotate(geom = "text", y = 0.7, x = 5.25, hjust = 0,
+  annotate(geom = "text", y = 0.9, x = 7.2, hjust = 0,
            family = "Univers", 
-           color = "#fcf7e8", size = 25, angle = 7.5,
+           color = "#fcf7e8", size = 28, angle = 3.5,
            label = glue("
                         NINE-NINE")) +
-  scale_x_continuous(expand = c(0, 0), limits = c(0, 12)) +
+  scale_x_continuous(expand = c(0, 0), limits = c(0, 16)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 5.5)) +
   theme_void() +
   theme(plot.background = element_rect(color = "#F9FEFF", 
@@ -548,60 +526,55 @@ header <- ggplot(data = rect, aes(x, y, group = id, fill = id)) +
 header
 ```
 
-NOICE TOIT
+![](https://media.tenor.com/images/098e4852dfdc41991add5983e9262a92/tenor.gif)
 
-![]()
+After going through this process (read: ordeal) I don't recommend making stuff like this manually as it can be quite time consuming especially if you have to get it to fit alongside other stuff!
 
-```{r}
-?cowplot::plot_grid()
-grid::textGrob()
-grid::circleGrob()
+Finally, let me just add a footer:
+
+```{r fig.width=16, fig.height = 1}
+foot <- ggplot() + 
+ annotate(geom = "text", x = 12.5, y = 0.5,
+          size = 4, family = "Univers", color = 'white', hjust = 0,
+          label= glue("
+                      Source: Wikipedia, Nielsen Ratings, IMDB
+                      By @R_by_Ryo")) + 
+  lims(x = c(0, 16), y = c(0, 1)) +
+  theme_b99() +
+  theme(panel.grid = element_blank(),
+        text = element_blank())
+
+foot
 ```
 
-## Arrange plots with grid
+
+## Arrange plots with cowplot
 
 Now for the coup-de-grace, arranging all of the plots and the title card together to create a Brooklyn Nine-Nine infographic!
 
 ```{r fig.height=12, fig.width=16}
-grid.arrange(
-  ncast_plot,
-  rating_plot,
-  viewer_plot,
-  header,
-  heights = c(1, 1, 0.05, 1),
-  widths = c(2, 2, 0.1, 2, 2),
-  layout_matrix = rbind(c(4, 4, 4, 4, 4),
-                        c(1, 1, NA, 2, 2),
-                        c(NA, NA, NA, NA, NA),
-                        c(3, 3, 3, 3, 3))
-)
-```
-
-![yay](https://media2.giphy.com/media/l4JySAWfMaY7w88sU/source.gif)
-
-## cowplot
-
-```{r fig.height=12, fig.width=16}
 the_nine_nine_plot <- plot_grid(
-  header,
-  plot_grid(
-    ncast_plot
-  ),
-  plot_grid(
-    rating_plot, viewer_plot,
-    rel_widths = c(3, 5)
-  ),
-  ncol = 1, rel_heights = c(3, 5, 5))
+  plot_grid(header),
+  plot_grid(viewer_plot),
+  plot_grid(box_plot, ncast_plot,
+            rel_widths = c(3, 4)),
+  plot_grid(foot),
+  ncol = 1, rel_heights = c(1, 1, 1, 0.25))
 
-png("../output/b_99_complete.png", width = 1600, height = 1200)
+png("../output/b_99_complete_boxplot.png", width = 1600, height = 1200, res = 108)
 the_nine_nine_plot
 dev.off()
 ```
 
+![yay](https://media2.giphy.com/media/l4JySAWfMaY7w88sU/source.gif)
 
 # Conclusion
 
-In this blog post I went over creating your own custom `ggplot2` theme, web scraping, cleaning and tidying data frames with the `tidyverse`, and creating a variety of plots to show simple statistics on Brooklyn Nine-Nine. To conclude I just wanted to list out my top five "Cold Opens" (in no particular order):
+In this blog post I went over creating your own custom `ggplot2` theme, web scraping, cleaning and tidying data frames with the `tidyverse`, and creating a variety of plots to show simple statistics on Brooklyn Nine-Nine. 
+
+The plots were pretty simple so the main problems I had were in mainly sizing and scaling stuff properly. I feel like some of it is still not perfect but it's good enough for now. This is an area I feel like I need to improve on and find ways to automatically scale things using `magick` or custom functions. This was also my first time using a different color scheme as the base for my plots as usually I just slap `theme_minimal()` to most things and call it a day. It took me a while to get the color coordination right and I think I got it to a level where it isn't blinding to look at! 
+
+To conclude I just wanted to list out my top five "Cold Opens" (in no particular order):
 
 - Halloween: Boyle == Denis Stojko
 - THE FULL BULL PEN
@@ -614,5 +587,3 @@ Agree? Disagree? Let me know in the comments below!
 I hope you had as much fun reading this as I did making it. If you didn't, then well...
 
 ![yaboring](https://66.media.tumblr.com/c0584c949c88744289b97aecd7186eba/tumblr_osdftshJze1ukq7ljo4_400.gif)
-
-
