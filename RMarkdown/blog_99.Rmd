@@ -2,30 +2,33 @@
 title: "Untitled"
 author: "RN7"
 date: "February 2, 2019"
-output: html_document
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown_github
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center")
 ```
 
-"Hey there criminal. It's me, Johnny Law!" - Jake Peralta, NYPD.
+> "Hey there criminal. It's me, Johnny Law!" - Jake Peralta, NYPD.
 
 Brooklyn Nine-Nine has become one of my favorite sitcoms in recent years, probably taking over from Parks & Recreation and Community. So in this blog post, I'm going to web scrape some very simple statistics, clean it up with the `tidyverse`, and visualize it with `ggplot2`... 
 
-"Terry loves `ggplot2`!"
+__"Terry loves ggplot2!"__
 
 Let's get started!
 
 # Packages
 
 ```{r warning=FALSE, message=FALSE}
-pacman::p_load(tidyverse, rvest, glue, cowplot, ggbeeswarm,
-               polite, extrafont, scales, gridExtra)
+pacman::p_load(tidyverse, rvest, glue, cowplot, ggbeeswarm, gt,
+               polite, extrafont, scales, gridExtra, knitr, kableExtra)
 loadfonts() # "Univers" and "Univers LT 93 ExtraBlackEx" fonts
 ```
 
-# B99 custom theme
+# B99 Custom Theme
 
 First, I will create a custom Brooklyn Nine-Nine theme that I can put on every plot that I will create. This will save me time from typing in the same options over and over again! I googled the font type that the official Brooklyn Nine-Nine media uses, downloaded them, and got it installed for R using the `extrafont` package. For some of the different colors you'll see in the plots I sourced them from pasting in the Brooklyn Nine-Nine logo and other official media images into [imagecolorpicker.com](https://imagecolorpicker.com/en) and saving the hex codes that it gave me. Otherwise, I experimented with different palettes from perusing [Emil Hvitfeld's](https://twitter.com/Emil_Hvitfeldt/) awesome [r-color-palettes](https://github.com/EmilHvitfeldt/r-color-palettes) Github repository (Also special thanks to [David Smale](https://twitter.com/committedtotape) for giving me some advice on using color!).
 
@@ -63,17 +66,19 @@ theme_b99 <- function(){
 
 Now the plots will all look very similar like a good police squad should:
 
-![](https://media3.giphy.com/media/3oxHQoyto7T8wBjUJ2/giphy.gif)
+<center>
+<img src = "https://media3.giphy.com/media/3oxHQoyto7T8wBjUJ2/giphy.gif" width = "450" />
+</center>
 
 With that done, I can start making plots!
 
-# Episode ratings
+# Episode Ratings
 
 As in my more [recent](https://ryo-n7.github.io/2019-01-11-visualize-asian-cup/) blog posts I will use the `polite` package to web scrape responsibly (note the `bow()` and `scrape()` functions).
 
 I `map_2()` over the IMDB page for the episodes for each season and I append the season number to each episode row. After I'm done with the web scraping I `mutate()` in the episode number for each season.
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 url_df <- tibble(
   urls = c("https://www.imdb.com/title/tt2467372/episodes?season=1",
            "https://www.imdb.com/title/tt2467372/episodes?season=2",
@@ -129,7 +134,7 @@ glimpse(ep_rating_df)
 
 OK, looks good.
 
-## Episode Ratings Plot: Heatmap and boxplot
+## Episode Ratings Plot: Heatmap and Boxplot
 
 I used `geom_tile()` to create a heat map of episode ratings with the season number as the rows and the episode number for that season as the columns. I used the `dichromat` package for the color scheme "LightBluetoDarkBlue.10", it meshes pretty well with the Brooklyn 99 color theme!
 
@@ -158,7 +163,7 @@ rating_plot
 
 From what we can see on the graph there doesn't seem to be any trends along either axes besides the fact that the finales and the subsequent opening episode of the following season are generally well-received. Two stand out episodes from Season 5 can be clearly seen in the plot. These episodes are "HalloVeen" (the fifth Halloween episode of the series)  and "The Box" (an excellent episode featuring Sterling K. Brown as the perp). 
 
-## Box plot
+## Box Plot
 
 Another way to visualize this would be with the box plot. This way allows you to make a comparison between seasons, whereas the heat map could be used to pick out any trends over time or sequence.
 
@@ -188,7 +193,7 @@ box_plot <- ep_rating_df %>%
 box_plot
 ```
 
-Noice, Toit, Smort! We get the best of both worlds by combining two different types of visualizing distributions. Let's check out which episodes those red dots are...
+Noice, Smort! We get the best of both worlds by combining two different types of visualizing distributions. Let's check out which episodes those red dots are...
 
 ```{r}
 ep_rating_df %>% 
@@ -199,22 +204,33 @@ ep_rating_df %>%
   select(-n, -third_quantile)
 ```
 
-Mostly end-of-season episodes just like what we saw in the heat map.
-
-Besides the (re)appearances of Doug Judy, Brooklyn Nine-Nine is known for its Halloween Episodes.
+Besides the (re)appearances of Doug Judy, Brooklyn Nine-Nine is known for its Halloween Episodes. I wanted to use `gt` somewhere in this blog post but that's little bit overkill so a `kable` table will suffice for now.
 
 ```{r}
-
+ep_rating_df %>% 
+  group_by(season) %>% 
+  top_n(n = 5, wt = rating) %>% 
+  arrange(desc(rating)) %>% 
+  mutate(rank = row_number()) %>% 
+  arrange(season, desc(rating)) %>% 
+  filter(str_detect(title, "Hallo")) %>% 
+  rename(Title = title, Rating = rating, Season = season,
+         `Episode Number` = ep_num, Rank = rank) %>% 
+  kable(format = "html",
+        caption = "The Halloween Episodes and Rank in Season") %>% 
+  kable_styling(full_width = FALSE)
 ```
 
-It is very clear that the Halloween episodes are highly regarded (to those that rate B99 on IMDB).
+It is very clear that the Halloween episodes are highly regarded to those that rate B99 on IMDB (although I'm sure most fans including myself will agree).
 
-![](https://78.media.tumblr.com/5fd58d43ff6eeb965c9d623d783f31eb/tumblr_oy44wkivKi1vj8gn9o1_540.gif)
+<center>
+<img src = "https://78.media.tumblr.com/5fd58d43ff6eeb965c9d623d783f31eb/tumblr_oy44wkivKi1vj8gn9o1_540.gif" width = "450" />
+</center>
 
 A more recent variant for showing a distribution is the ridge-line plot, courtesy of the [ggridges](https://github.com/clauswilke/ggridges) package:
 
 ```{r fig.height=5, fig.width=7}
-ep_rating_df2 <- ep_rating_df2 %>% 
+ep_rating_df2 <- ep_rating_df %>% 
   mutate(season = as_factor(as.character(season)))
 
 ep_rating_df2 %>% 
@@ -230,17 +246,17 @@ ep_rating_df2 %>%
   theme(panel.grid.minor = element_blank())
 ```
 
-![the statistical analysis gif](https://media.giphy.com/media/8PQOq6nMYO0kU/giphy.gif)
+<center>
+<img src = "https://media.giphy.com/media/8PQOq6nMYO0kU/giphy.gif" width = "450" />
+</center>
 
-Well OK, they're just box plots but I wanted to use this GIF in some capacity! 
+Well OK, we're just looking at distributions... but I wanted to use this GIF in some capacity!
 
-# Cast appearances
+# Cast Appearances
 
-The main cast of B99 are pretty tightly knit and as members of the same precinct it makes sense that they'll generally appear together. So I wanted to look at what non-main cast members and guests made the most appearances on the show. Special note: Hitchcock and Scully weren't officially "main cast" until Season 2 but I left them out of the non-main cast list.
+The main cast of B99 are pretty tightly knit and as members of the same precinct it makes sense that they'll generally appear together. So instead, I wanted to look at what non-main cast members and guests made the most appearances on the show. __Special note__: Hitchcock and Scully weren't officially "main cast" until Season 2 but I left them out of the non-main cast list. After scraping for the full cast list and main cast list, I `anti_join()` them so I am left with the non-main cast and the number of episodes that they appeared in.
 
-Finally I `anti_join()` the main cast list from the full cast list so I am left with the non-main cast and the number of episodes that they appeared in.
-
-```{r}
+```{r warning=FALSE, message=FALSE}
 # Entire cast:
 cast_url <- bow("https://www.imdb.com/title/tt2467372/fullcredits?ref_=tt_cl_sm#cast")
 
@@ -278,7 +294,8 @@ cast_main_clean <- cast_main_raw %>%
   select(Character)
 
 # anti-join
-non_main_cast <- anti_join(cast_info_clean, cast_main_clean, by = c("name" = "Character"))
+non_main_cast <- anti_join(cast_info_clean, cast_main_clean, 
+                           by = c("name" = "Character"))
 ```
 
 ## Non-Main Cast Appearances Plot
@@ -323,11 +340,13 @@ ncast_plot <- ggdraw(insert_xaxis_grob(non_main_plot, pimage, position = "bottom
 ncast_plot
 ```
 
-Adrian has appeared in the most episodes just beating out Kevin. This really shows how involved Adrian was in the story in Season 4 and 5 especially compared to Kevin who has periodically appeared since the first season. Everybody's favorite DOUG JUDY rounds off this bar chart.
+Adrian has appeared in the most episodes just beating out Kevin. This really shows how involved Adrian was in the story in Season 4 and 5 especially compared to Kevin who has been popping in and out since the first season. Everybody's favorite __DOUG JUDY__ rounds off this bar chart.
 
-![doug judy New york's finest gif](https://66.media.tumblr.com/87972a8335ae460091c2005ff519f009/tumblr_omcy241y071w4nkyqo4_400.gif)
+<center>
+<img src = "https://66.media.tumblr.com/87972a8335ae460091c2005ff519f009/tumblr_omcy241y071w4nkyqo4_400.gif" width = "450" />
+</center>
 
-# Viewer numbers
+# Viewer Numbers
 
 Pretty much the same M.O. as what I did to get the episode ratings here. One thing of note was using regex to get rid of the footnotes. I had to be careful to double escape the square brackets there.
 
@@ -363,14 +382,15 @@ ep_info_df <- map2(.x = url_wiki_df$urls, .y = url_wiki_df$season_num,
          mutate(season = .y)) %>% 
   reduce(rbind)
 
-glimpse(ep_info_df)
+ep_info_df %>% 
+  slice(77:83)
 ```
 
-## tidylog demo
+## tidylog Demonstration
 
 A little intermission here as I wanted to talk about this cool package I recently found on Twitter called [tidylog](https://github.com/elbersb/tidylog). To show you an example, I will take a look at which writers wrote the most episodes in Season 5:
 
-```{r}
+```{r, warning=FALSE}
 library(tidylog)
 
 ep_info_df %>% 
@@ -380,7 +400,8 @@ ep_info_df %>%
   mutate(writer = writer %>% trimws) %>% 
   group_by(writer) %>% 
   summarize(n = n()) %>% 
-  arrange(desc(n))
+  arrange(desc(n)) %>% 
+  head(5)
 ```
 
 You can see that it gives you details on what each `dplyr` function changed in your data frame in the order that the operations were performed. It's pretty cool and it gets more useful as your `dplyr` pipeline grows longer! Let's turn tidylog off for now:
@@ -391,15 +412,15 @@ options("tidylog.display" = list())
 
 ## Viewers Plot
 
-The episode info data frame we got from Wikipedia had a lot of different information so let's chop it down a bit to get a data frame on the number of viewers per episode.
+The episode info data frame we got from Wikipedia had a lot of information so let's chop it down a bit to get data on the number of viewers per episode.
 
-From what we saw from `glimpse()`-ing the `ep_info_df` earlier the data looked pretty clean already... except for "The Fugitive" episodes being formatted differently... 
+From what we saw of `ep_info_df` earlier, the data looked pretty clean already except for "The Fugitive" episodes being formatted differently... 
 
-![WHYYYY.gif](https://66.media.tumblr.com/cc01463acbe445711497b5c979b996d1/tumblr_ov5bc3udjC1ty7lb2o1_540.gif) 
+<center>
+<img src = "https://66.media.tumblr.com/cc01463acbe445711497b5c979b996d1/tumblr_ov5bc3udjC1ty7lb2o1_540.gif" width = "450" />
+</center>
 
-There are other multi-part episodes throughout the show but this pair is the only one that aired on the same day, on New Years Day 2017 so they got smushed together in the Wikipedia table when we scraped it. There wasn't a quick and easy way to `regex` them into separate rows so I just filtered them out and added them back in.
-
-Then at the end of the pipe, I create a `first` and `last` variable for each season taking note of what overall episode number the first and last episodes of each season were. You'll see why I did this soon.
+There are other multi-part episodes throughout the show but this pair is the only one that aired on the same day, on New Years Day 2017 so they got smushed together in the Wikipedia table when we scraped it. There wasn't a quick and easy way to `regex` them into separate rows so I just filtered them out and added them back in. Then at the end of the pipe, I create a `first` and `last` variable for each season taking note of what overall episode number the first and last episodes of each season were. You'll see why I did this soon.
 
 ```{r fig.height = 4, fig.width = 10}
 viewers_df <- ep_info_df %>% 
@@ -420,7 +441,7 @@ viewers_df <- ep_info_df %>%
   ungroup() 
 ```
 
-For this plot I use `geom_rect()` to give a colored background for each season. Setting the span of the Xs as the `first` and `last` episode number of each season and then using `Inf` and `-Inf` for the Ys to cover the entire height of the plot.
+For this plot I use `geom_rect()` to give a colored background for each season. Setting the span of the Xs as the `first` and `last` episode number of each season for the width and using `Inf` and `-Inf` for the Ys to cover the entire height of the plot.
 
 For the season labels I calculated the midpoint along the x-axis for each season and used that as the x values (not shown in the code). I could have used facets but to the best of my knowledge I wouldn't have been able to place the labels on top across multiple facets anyways. It may be possible by placing text grobs on top of the facetted plot but I thought that would take more time compared to what I did with `geom_rect()`. Otherwise I use a lot of `annotate()` code to add in the episode details and season titles.
 
@@ -487,13 +508,14 @@ I added in details on why certain episodes had such high viewership compared to 
 
 Throughout it's run on FOX, the show averaged around 2~3.5 million viewers with numerous peaks and troughs until the 5th season where it only averaged around 1.8 million viewers but kept those numbers very consistently across the entire season.
 
-# Creating the title card
+# Creating the Title Card
 
 The last thing I want to do to wrap this blog post up is to create an infographic containing the plots I made above. Before I combine them all I want to make a title card that looks as similar to the official Brooklyn Nine-Nine title card you see at the beginning of the episode. 
-
 Here's what it looks like:
 
-![](https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Brooklyn_nine-nine_logo.png/800px-Brooklyn_nine-nine_logo.png)
+<center>
+<img src = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Brooklyn_nine-nine_logo.png/800px-Brooklyn_nine-nine_logo.png" width = "450" />
+</center>
 
 Now I could just paste the `URL` for the picture into my graph but why not try making it yourself? So, I used `geom_polygon()` to construct the two diagonal colored bars and then placed the text on top of them with `annotate()`. 
 
@@ -528,9 +550,11 @@ header <- ggplot(data = rect, aes(x, y, group = id, fill = id)) +
 header
 ```
 
-![](https://media.tenor.com/images/098e4852dfdc41991add5983e9262a92/tenor.gif)
+<center>
+<img src = "https://media.tenor.com/images/098e4852dfdc41991add5983e9262a92/tenor.gif" width = "200" />
+</center>
 
-After going through this process (read: ordeal) I don't recommend making stuff like this manually as it can be quite time consuming especially if you have to get it to fit alongside other stuff!
+After going through this process (read: time-consuming ordeal) I don't recommend making stuff like this manually as it can be quite time consuming especially if you have to get it to fit alongside other stuff!
 
 Finally, let me just add a footer:
 
@@ -550,7 +574,7 @@ foot
 ```
 
 
-## Arrange plots with cowplot
+## Arrange Plots with cowplot
 
 With all the components done, now I just need to arrange all of the plots, the title card, and the footer together to create the Brooklyn Nine-Nine infographic!
 
@@ -568,7 +592,9 @@ the_nine_nine_plot <- plot_grid(
 the_nine_nine_plot
 ```
 
-![yay](https://media2.giphy.com/media/l4JySAWfMaY7w88sU/source.gif)
+<center>
+<img src = "https://media2.giphy.com/media/l4JySAWfMaY7w88sU/source.gif" width = "450" />
+</center>
 
 # Conclusion
 
@@ -578,14 +604,16 @@ The plots were pretty simple so the main problems I had were in sizing and scali
 
 To conclude I just wanted to list out my top five "Cold Opens" (in no particular order):
 
-- Halloween: Boyle == Denis Stojko
-- THE FULL BULL PEN
-- HOT DAMN! ![]()
-- Holt wearing a red hat to work.
-- "I came down with a Dianne Weast infection..."
+- [Halloween Boyle](https://www.youtube.com/watch?v=RzWSM-liu4I)
+- [THE FULL BULL PEN](https://www.youtube.com/watch?v=lFqqXYVdrUs)
+- [Amy is late to work](https://www.youtube.com/watch?v=EQ6HaIP5uwg)
+- [Holt's new hat](https://www.youtube.com/watch?v=rxZBW8Pfklc)
+- [Boyle's weekend](https://youtu.be/O9gg0pz7rlc?t=404)
 
 Agree? Disagree? Let me know in the comments below!
 
 I hope you had as much fun reading this as I did making it. If you didn't, then well...
 
-![yaboring](https://66.media.tumblr.com/c0584c949c88744289b97aecd7186eba/tumblr_osdftshJze1ukq7ljo4_400.gif)
+<center>
+<img src = "https://66.media.tumblr.com/c0584c949c88744289b97aecd7186eba/tumblr_osdftshJze1ukq7ljo4_400.gif" width = "450" />
+</center>
