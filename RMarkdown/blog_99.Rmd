@@ -11,9 +11,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 "Hey there criminal. It's me, Johnny Law!" - Jake Peralta, NYPD.
 
-Brooklyn Nine-Nine has become one of my favorite sitcoms in recent years, probably taking over from Parks & Recreation. So in this blog post, I'm going to web scrape some very simple statistics, clean it up with the `tidyverse`, and visualize it with `ggplot2`... 
+Brooklyn Nine-Nine has become one of my favorite sitcoms in recent years, probably taking over from Parks & Recreation and Community. So in this blog post, I'm going to web scrape some very simple statistics, clean it up with the `tidyverse`, and visualize it with `ggplot2`... 
 
 "Terry loves `ggplot2`!"
+
+Let's get started!
 
 # Packages
 
@@ -25,7 +27,7 @@ loadfonts() # "Univers" and "Univers LT 93 ExtraBlackEx" fonts
 
 # B99 custom theme
 
-First, let me create a custom Brooklyn NINE NINE theme that I can put on all of my plots. This will save me time from typing in the same options over and over again! I googled the font type that official Brooklyn Nine-Nine media used, downloaded them, and got it installed for R using the `extrafont` package. For some of the different colors you'll see in the plots I sourced them from pasting in the Brooklyn Nine-Nine logo and other official media images into [imagecolorpicker.com](https://imagecolorpicker.com/en) and saving the hex codes that it gave me. Otherwise, I experimented with different palettes from perusing [Emil Hvitfeld's]() awesome [r-color-palettes](https://github.com/EmilHvitfeldt/r-color-palettes) Github repository (Also special thanks to [David Smale]() for giving me some advice on using color!).
+First, I will create a custom Brooklyn Nine-Nine theme that I can put on every plot that I will create. This will save me time from typing in the same options over and over again! I googled the font type that the official Brooklyn Nine-Nine media uses, downloaded them, and got it installed for R using the `extrafont` package. For some of the different colors you'll see in the plots I sourced them from pasting in the Brooklyn Nine-Nine logo and other official media images into [imagecolorpicker.com](https://imagecolorpicker.com/en) and saving the hex codes that it gave me. Otherwise, I experimented with different palettes from perusing [Emil Hvitfeld's](https://twitter.com/Emil_Hvitfeldt/) awesome [r-color-palettes](https://github.com/EmilHvitfeldt/r-color-palettes) Github repository (Also special thanks to [David Smale](https://twitter.com/committedtotape) for giving me some advice on using color!).
 
 ```{r}
 theme_b99 <- function(){
@@ -59,15 +61,13 @@ theme_b99 <- function(){
 }
 ```
 
-Now the plots will all look very similar.
+Now the plots will all look very similar like a good police squad should:
 
 ![](https://media3.giphy.com/media/3oxHQoyto7T8wBjUJ2/giphy.gif)
 
 With that done, I can start making plots!
 
 # Episode ratings
-
-Calling `as_tibble()` on a vector is discouraged, because the behavior is likely to change in the future. Use `enframe(name = NULL)` instead.
 
 As in my more [recent](https://ryo-n7.github.io/2019-01-11-visualize-asian-cup/) blog posts I will use the `polite` package to web scrape responsibly (note the `bow()` and `scrape()` functions).
 
@@ -156,11 +156,13 @@ rating_plot <- ep_rating_df %>%
 rating_plot
 ```
 
-From what we can see on the graph there doesn't seem to be any trends along either axes besides the fact that the finales and the subsequent opening episode of the following season are well-received. The two stand out episodes can be clearly seen from Season 5. These episodes are "HalloVeen" (the fifth Halloween episode of the series)  and "The Box" (featuring Sterling K. Brown as the perp). 
+From what we can see on the graph there doesn't seem to be any trends along either axes besides the fact that the finales and the subsequent opening episode of the following season are generally well-received. Two stand out episodes from Season 5 can be clearly seen in the plot. These episodes are "HalloVeen" (the fifth Halloween episode of the series)  and "The Box" (an excellent episode featuring Sterling K. Brown as the perp). 
 
-Another way to visualize this would be the box plot. This way allows you to make a comparison between seasons, whereas the heat map could be used to pick out any trends over time or sequence.
+## Box plot
 
-The debate between violin plot vs. box plot vs. sina plot vs. etc. rages on to this day (some examples I've read over the years: [1](https://cerebralmastication.com/2009/02/box-plot-vs-violin-plot-in-r/), [2](https://simplystatistics.org/2017/07/13/the-joy-of-no-more-violin-plots/), [3](https://rpubs.com/crazyhottommy/sina-plot)) and some of the arguments made seem to come down to personal preference. The data I'm using is quite small (~20 episode ratings for each season) so in my case it might be better to use box plots (instead of violin plots) and sprinkle bee swarm points on top with the [ggbeeswarm](https://github.com/eclarke/ggbeeswarm) package. I commented out some of the other methods if you wanted to copy-paste this code chunk into your R console to try them out!
+Another way to visualize this would be with the box plot. This way allows you to make a comparison between seasons, whereas the heat map could be used to pick out any trends over time or sequence.
+
+The debate between violin plot vs. box plot vs. sina plot vs. etc. rages on to this day (some examples I've read over the years: [1](https://cerebralmastication.com/2009/02/box-plot-vs-violin-plot-in-r/), [2](https://simplystatistics.org/2017/07/13/the-joy-of-no-more-violin-plots/), [3](https://rpubs.com/crazyhottommy/sina-plot)) and some of the arguments made seem to come down to personal preference. Since the data I'm using is quite small (~20 episode ratings for each season), in my case it might be better to use box plots (instead of violin plots) and sprinkle bee swarm points on top with the [ggbeeswarm](https://github.com/eclarke/ggbeeswarm) package. I commented out some of the other methods if you wanted to copy-paste this code chunk into your R console to try them out!
 
 I highlighted the outliers for each season in red with the unintentional result being that the color scheme mimics that of the flag of Colorado...
 
@@ -186,14 +188,14 @@ box_plot <- ep_rating_df %>%
 box_plot
 ```
 
-Toit! We get the best of both worlds by combining two different types of visualizing distributions. Let's check out which episodes those red dots are...
+Noice, Toit, Smort! We get the best of both worlds by combining two different types of visualizing distributions. Let's check out which episodes those red dots are...
 
 ```{r}
 ep_rating_df %>% 
   group_by(season) %>% 
   mutate(n = n(),
          third_quantile = quantile(rating)[4]) %>% 
-  filter(rating > third_quantile + 1.58*(IQR(rating))) %>% 
+  filter(rating > third_quantile + 1.58 * (IQR(rating))) %>% 
   select(-n, -third_quantile)
 ```
 
@@ -550,9 +552,11 @@ foot
 
 ## Arrange plots with cowplot
 
-Now for the coup-de-grace, arranging all of the plots and the title card together to create a Brooklyn Nine-Nine infographic!
+With all the components done, now I just need to arrange all of the plots, the title card, and the footer together to create the Brooklyn Nine-Nine infographic!
 
-```{r fig.height=12, fig.width=16}
+There are several ways to do this like using `grid.arrange()` from the `grid` package or the newer `patchwork` package but I went for `cowplot::plot_grid()` this time.
+
+```{r fig.height=12, fig.width=16, dpi = 108}
 the_nine_nine_plot <- plot_grid(
   plot_grid(header),
   plot_grid(viewer_plot),
@@ -561,9 +565,7 @@ the_nine_nine_plot <- plot_grid(
   plot_grid(foot),
   ncol = 1, rel_heights = c(1, 1, 1, 0.25))
 
-png("../output/b_99_complete_boxplot.png", width = 1600, height = 1200, res = 108)
 the_nine_nine_plot
-dev.off()
 ```
 
 ![yay](https://media2.giphy.com/media/l4JySAWfMaY7w88sU/source.gif)
@@ -572,7 +574,7 @@ dev.off()
 
 In this blog post I went over creating your own custom `ggplot2` theme, web scraping, cleaning and tidying data frames with the `tidyverse`, and creating a variety of plots to show simple statistics on Brooklyn Nine-Nine. 
 
-The plots were pretty simple so the main problems I had were in mainly sizing and scaling stuff properly. I feel like some of it is still not perfect but it's good enough for now. This is an area I feel like I need to improve on and find ways to automatically scale things using `magick` or custom functions. This was also my first time using a different color scheme as the base for my plots as usually I just slap `theme_minimal()` to most things and call it a day. It took me a while to get the color coordination right and I think I got it to a level where it isn't blinding to look at! 
+The plots were pretty simple so the main problems I had were in sizing and scaling stuff properly. I feel like some of it is still not perfect but it's good enough for now. This is an area I feel like I need to improve on and find ways to automatically scale things using `magick` or custom functions. This was also my first time using a different color scheme for my plots, usually I just slap `theme_minimal()` to most things and call it a day. It took me a while to get the color coordination right and I think I got it to a level where it isn't nauseating to look at! 
 
 To conclude I just wanted to list out my top five "Cold Opens" (in no particular order):
 

@@ -819,3 +819,36 @@ rating_plot + viewer_plot + plot_layout(ncol = 2,
 
 ```
 
+# load all
+
+```{r}
+ep_rating_df <- readRDS("../data/ep_rating_df.RDS")
+ep_rating_df <- ep_rating_df %>% 
+  group_by(season) %>% 
+  mutate(ep_num = row_number()) %>% 
+  ungroup()
+
+cast_info_clean <- readRDS("../data/cast_info_clean.RDS")
+
+#saveRDS(cast_main_clean, "../data/cast_main_clean.RDS")
+cast_main_clean <- readRDS("../data/cast_main_clean.RDS")
+
+# anti-join
+non_main_cast <- anti_join(cast_info_clean, cast_main_clean, by = c("name" = "Character"))
+
+ep_info_df <- readRDS("../data/ep_info_df.RDS")
+```
+
+```{r fig.height=12, fig.width=16, dpi = 108}
+the_nine_nine_plot <- plot_grid(
+  plot_grid(header),
+  plot_grid(viewer_plot),
+  plot_grid(box_plot, ncast_plot,
+            rel_widths = c(3, 4)),
+  plot_grid(foot),
+  ncol = 1, rel_heights = c(1, 1, 1, 0.25))
+
+png("../output/b_99_complete_boxplot.png", width = 1600, height = 1200, res = 108)
+the_nine_nine_plot
+dev.off()
+```
