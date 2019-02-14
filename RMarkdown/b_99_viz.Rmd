@@ -815,8 +815,37 @@ rating_plot + viewer_plot + plot_layout(ncol = 2,
 
 ## cowplot
 
-```{r}
+```{r fig.width=16, fig.height=5.5}
+rect <- data.frame(id = as.factor(c(1, 1, 1, 1,
+                          2, 2, 2, 2)),
+                   x = c(16, 16, 0,    0,
+                         16, 16, 6.6,  6.5),
+                   y = c(5.1, 2, 0.4,  3.5,
+                         2.5, 0.8, 0,  1.6))
 
+header <- ggplot(data = rect, aes(x, y, group = id, fill = id)) +
+  geom_polygon() +
+  scale_fill_manual(values = c("#0053CD", "#000E33"), guide = FALSE) +
+  annotate(geom = "text", y = 2, x = 1.8, hjust = 0,
+           family = "Univers LT 93 ExtraBlackEx", 
+           color = "#fcf7e8", size = 40, angle = 5,
+           label = glue("
+                        BROOKLYN")) +
+  annotate(geom = "text", y = 0.9, x = 7.2, hjust = 0,
+           family = "Univers", 
+           color = "#fcf7e8", size = 28, angle = 3.5,
+           label = glue("
+                        NINE-NINE")) +
+  scale_x_continuous(expand = c(0, 0), limits = c(0, 16)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 5.5)) +
+  theme_void() +
+  theme(plot.background = element_rect(color = "#F9FEFF", 
+                                       fill = "#F9FEFF", 
+                                       size = 8))
+
+header
+
+ggsave(plot = header, filename = "../output/header.png", height = 5.5, width = 16)
 ```
 
 # load all
@@ -830,7 +859,6 @@ ep_rating_df <- ep_rating_df %>%
 
 cast_info_clean <- readRDS("../data/cast_info_clean.RDS")
 
-#saveRDS(cast_main_clean, "../data/cast_main_clean.RDS")
 cast_main_clean <- readRDS("../data/cast_main_clean.RDS")
 
 # anti-join
@@ -838,6 +866,161 @@ non_main_cast <- anti_join(cast_info_clean, cast_main_clean, by = c("name" = "Ch
 
 ep_info_df <- readRDS("../data/ep_info_df.RDS")
 ```
+
+
+
+```{r fig.height=5, fig.width=7}
+cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
+          "3" = "#000E33", "4" = "#CBCFD2", "5" = "#175E78")
+
+box_plot <- ep_rating_df %>% 
+  ggplot(aes(x = season, y = rating, group = season)) +
+  geom_boxplot(color = "#F9FEFF", fill = "#000E33",
+              outlier.color = "red", outlier.size = 5) +
+  geom_beeswarm(color = "#FCF40E", cex = 2, size = 2.25) +
+  scale_y_continuous(limits = c(7.5, 9.6),
+                     labels = c(7.5, 8, 8.5, 9, 9.5)) +
+  labs(title = "Episode Ratings by Season",
+       x = "Season", y = "Rating",
+       caption = glue("
+                      Source: Wikipedia, Nielsen Ratings, & IMDB
+                      By: @R_by_Ryo")) +
+  theme_b99() +
+  theme(panel.grid.minor = element_blank())
+
+box_plot
+
+ggsave(plot = box_plot, filename = "../output/boxplot.png", height = 5, width = 7)
+```
+
+```{r fig.height = 6, fig.width = 10}
+non_main_plot <- non_main_cast %>% 
+  arrange(desc(episode_num)) %>% 
+  head(5) %>% 
+  mutate(halfway = episode_num / 2) %>% 
+  ggplot(aes(x = reorder(name, desc(episode_num)), y = episode_num)) +
+  geom_col(fill = "#000E33") +
+  geom_text(aes(y = halfway, label = episode_num,
+                family = "Univers"),
+            color = "#F9FEFF",
+            size = 8) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 12.5),
+                     breaks = c(2, 4, 6, 8, 10, 12),
+                     labels = c(2, 4, 6, 8, 10, 12)) +
+  labs(title = "Most Appearances by Non-Main Cast", 
+       x = NULL, y = "Number of Episodes",
+       caption = glue("
+                      Source: Wikipedia, Nielsen Ratings, & IMDB
+                      By: @R_by_Ryo")) +
+  theme_b99() +
+  theme(panel.grid.major.x = element_blank())
+
+# images
+pimage <- axis_canvas(non_main_plot, axis = 'x') + 
+  draw_image(
+    "https://vignette.wikia.nocookie.net/tvdatabase/images/d/d5/Adrian_Pimento.jpg", 
+    x = 0.5, scale = 1.3, clip = "on") +
+  draw_image(
+    "https://vignette.wikia.nocookie.net/brooklynnine-nine/images/a/ab/Kevin.jpg", 
+    x = 1.5, scale = 1.3, clip = "on") +
+  draw_image(
+    "https://vignette.wikia.nocookie.net/brooklynnine-nine/images/b/b3/Wuntch.png", 
+    x = 2.5, scale = 1.3, clip = "on") +
+  draw_image(
+    "https://vignette.wikia.nocookie.net/brooklynnine-nine/images/2/23/Vulture.jpg",
+    x = 3.5, scale = 1.3, clip = "on") +
+  draw_image(
+    "https://vignette.wikia.nocookie.net/brooklynnine-nine/images/0/0a/Doug_Judy.png",
+    x = 4.5, scale = 1.3, clip = "on")
+
+# insert the image strip into the bar plot and draw  
+ncast_plot <- ggdraw(insert_xaxis_grob(non_main_plot, pimage, position = "bottom"))
+
+ncast_plot
+
+ggsave(plot = ncast_plot, filename = "../output/ncast_plot.png", height = 6, width = 10)
+```
+
+```{r fig.height = 6, fig.width = 11}
+viewers_df <- ep_info_df %>% 
+  select(season, num_season, title, num_overall, viewers) %>% 
+  # manually fix "The Fugitive" episodes
+  filter(num_overall != 7980) %>% 
+  add_row(season = 4, num_season = 11, title = "The Fugitive: Part 1", 
+          num_overall = 79, viewers = 3.49) %>% 
+  add_row(season = 4, num_season = 12, title = "The Fugitive: Part 2", 
+          num_overall = 80, viewers = 3.49) %>% 
+  mutate(num_overall = as.numeric(num_overall),
+         num_season = as.numeric(num_season),
+         season = as_factor(as.character(season))) %>% 
+  arrange(num_overall) %>% 
+  group_by(season) %>% 
+  mutate(first = first(num_overall),
+         last = last(num_overall)) %>% 
+  ungroup() 
+
+cols <- c("1" = "#6CA9C3", "2" = "#3A3533", 
+          "3" = "#000E33", "4" = "#CBCFD2", "5" = "#175E78")
+
+viewer_plot <- viewers_df %>% 
+  ggplot(aes(x = num_overall, y = viewers, group = season)) +
+  geom_rect(aes(xmin = first, xmax = last,
+                fill = season), alpha = 0.2,
+            ymin = -Inf, ymax = Inf) +
+  geom_line(color = "white", size = 1.1) +
+  scale_fill_manual("Season", values = cols, guide = FALSE) +
+  scale_y_continuous(limits = c(0, 20),
+                     breaks = c(seq(0, 15, by = 2.5)),
+                     expand = c(0, 0)) +
+  scale_x_continuous(breaks = c(seq(0, 112, by = 5)),
+                     labels = c(seq(0, 112, by = 5)),
+                     expand = c(0, 0)) +
+  labs(x = "Episode Number (Overall)", y = "Viewers (Millions)",
+       title = "Viewers by Episode",
+       caption = glue("
+                      Source: Wikipedia, Nielsen Ratings, & IMDB
+                      By: @R_by_Ryo")) +
+  theme_b99() +
+  theme(panel.grid = element_blank()) +
+  # Line segments
+  annotate(geom = "segment", x = 15, xend = 15, y = 15, yend = 16., 
+           color = "black", size = 1.2) +
+  annotate(geom = "segment", x = 34, xend = 34, y = 6, yend = 7, 
+           color = "black", size = 1.2) +
+  annotate(geom = "segment", x = 79.5, xend = 79.5, y = 3.5, yend = 5, 
+           color = "black", size = 1.2) +
+  # Episode details
+  annotate(geom = "label", x = 7, y = 16.5, hjust = 0, size = 4.5,
+           family = "Univers",
+           label = "Operation: Broken Feather (Aired after Super Bowl XLVIII)") +
+  annotate(geom = "label", x = 25, y = 7.5, hjust = 0, size = 4.5, 
+           family = "Univers",
+           label = "Beach House (Sunday before First Workday of 2015)") +
+  annotate(geom = "label", x = 67, y = 5, hjust = 0, size = 4.5,
+           family = "Univers",
+           label = "The Fugitive: Part 1 & 2 (New Years Day 2017)") +
+  # Season titles
+  annotate(geom = "label", x = 11.5, y = 19, size = 7,
+           family = "Univers",
+           label = "Season One") +
+  annotate(geom = "label", x = 34, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Two") +
+  annotate(geom = "label", x = 57, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Three") +
+  annotate(geom = "label", x = 79.5, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Four") +
+  annotate(geom = "label", x = 102, y = 19, size = 7,
+           family = "Univers",
+           label = "Season Five") 
+
+viewer_plot
+
+ggsave(plot = viewer_plot, filename = "../output/viewer_plot.png", height = 6, width = 11)
+```
+
 
 ```{r fig.height=12, fig.width=16, dpi = 108}
 the_nine_nine_plot <- plot_grid(
@@ -848,7 +1031,13 @@ the_nine_nine_plot <- plot_grid(
   plot_grid(foot),
   ncol = 1, rel_heights = c(1, 1, 1, 0.25))
 
-png("../output/b_99_complete_boxplot.png", width = 1600, height = 1200, res = 108)
+png("../output/nine_nine_plot.png", width = 1600, height = 1200, res = 108)
 the_nine_nine_plot
 dev.off()
 ```
+
+
+```{r}
+rmarkdown::render("RMarkdown/blog_99.rmd", clean = FALSE)
+```
+
