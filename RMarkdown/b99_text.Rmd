@@ -1,0 +1,81 @@
+---
+title: "Untitled"
+author: "RN7"
+date: "9/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+pacman::p_load(dplyr, tidyr, purrr, stringr, 
+               glue, readr,
+               rvest, polite, tvthemes,
+               ggplot2, scales, ggtext,
+               grid, gridExtra)
+```
+
+
+```{r}
+main_url <- "https://www.opensubtitles.org/en/ssearch/sublanguageid-eng/idmovie-158594/"
+
+session <- bow(main_url)
+
+all_tabs <- scrape(session) %>%
+  html_nodes(xpath = '//*[(@id <- "search_results")]') %>%
+  html_table(fill = TRUE)
+
+ep_links <- scrape(session) %>% 
+  html_nodes("a") %>% 
+  html_attr("href")
+
+ep_titles <- scrape(session) %>% 
+  html_nodes("a") %>% 
+  html_attr("title")
+
+links_all_raw <- tibble(link = ep_links, 
+                        title = ep_titles) 
+
+links_all_clean <- links_all_raw %>% 
+  filter(!is.na(title)) %>% 
+  distinct(link, .keep_all = TRUE) %>% 
+  mutate(link = link %>% 
+           str_replace_all(
+             "^/en/search/", 
+             "https://www.opensubtitles.org/download/s/")) %>% 
+  filter(str_detect(link, "imdb")) %>%
+  mutate(title = title %>% str_replace_all("\"Brooklyn Nine-Nine\" ", ""),
+         season = c(rep("S01", 22), rep("S02", 23), rep("S03", 23),
+                    rep("S04", 21), rep("S05", 22), rep("S06", 18)),
+         episode = c(1:22, 1:23, 1:23, 
+                     1:21, 1:22, 1:18)) %>% 
+  mutate(episode = if_else(nchar(episode) == 1, 
+                           paste0("E0", episode), 
+                           paste0("E", episode)),
+         file_name = glue(
+           "{season}_{episode}_{str_replace_all(title, '[[:punct:]]', '')}"),
+         file_name = str_replace_all(file_name, " ", "_")) %>% 
+  select(episode, season, title, file_name, link)
+
+write_csv(links_all_clean,
+          path = here::here("data/b99_ep_subtitle_links.csv"))
+```
+
+
+
+```{r}
+links_all_clean <- read_csv(file = here::here("data/b99_ep_subtitle_links.csv"))
+```
+
+
+
+
+
+
+
+
+
+
