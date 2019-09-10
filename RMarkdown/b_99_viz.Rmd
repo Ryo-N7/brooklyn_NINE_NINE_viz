@@ -1036,8 +1036,35 @@ the_nine_nine_plot
 dev.off()
 ```
 
+# render
 
 ```{r}
 rmarkdown::render("RMarkdown/blog_99.rmd", clean = FALSE)
+```
+
+
+
+
+
+
+# find score-appearances difference
+
+
+```{r}
+ep_rating_df %>% 
+  filter(title %in% c("The Negotiation", "The Fugitive, Part 1", "The Fugitive, Part 2",
+                      "The Cruise", "The Pontiac Bandit Returns", "Pontiac Bandit")) %>% 
+  summarize(avg = mean(rating),
+            med = median(rating))
+```
+
+
+```{r}
+ep_rating_df %>% 
+  filter(title %in% c("Gray Star Mutual", "Kicks", "The Bank Job", "Mr. Santiago",
+                      "Monster in the Closet", "Paranoia", "Terry Kitties", 
+                      "Cheddar", "Adrian Pimento")) %>% 
+  summarize(avg = mean(rating),
+            med = median(rating))
 ```
 
