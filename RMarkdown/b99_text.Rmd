@@ -73,6 +73,78 @@ links_all_clean <- read_csv(file = here::here("data/b99_ep_subtitle_links.csv"))
 
 
 
+```{r}
+for(j in 1:nrow(links_all_clean)) {
+  if(!file.exists(paste0("../data/subtitles/",
+                         links_all_clean$file_name[j],
+                         ".zip"))) {
+    
+    Sys.sleep(sample(seq(0.5, 1.5, by = 0.5), 1))
+    
+    downloader::download(url = links_all_clean$link[j], 
+                         destfile = paste0("../data/subtitles/", 
+                         links_all_clean$file_name[j],
+                         ".zip"), mode = "wb")
+  }
+}
+```
+
+
+
+```{r}
+library(downloader)
+
+
+download(url = "https://www.opensubtitles.org/download/s/sublanguageid-eng/imdbid-2936284", destfile = "../data/subtitles/test.zip", mode = "wb")
+
+
+ unzip("../data/subtitles/test.zip", 
+       exdir = "../data/subtitles", overwrite = F)
+```
+
+
+```{r}
+
+links_all_clean <- links_all_clean %>% slice(1:5)
+
+fs::dir_create(here::here("data/subtitles"))
+
+downloadSubtitles <- function(link = link, file_name = file_name) {
+  if(!file.exists(here::here(glue::glue("data/subtitles/{file_name}.zip")))) {
+    Sys.sleep(5)
+    downloader::download(url = link,
+                         destfile = here::here(
+                           glue::glue("data/subtitles/{file_name}.zip")), 
+                         mode = "wb")
+    cat("Downloaded", file_name, "!\n")
+  }
+}
+
+purrr::walk2(links_all_clean$link, links_all_clean$file_name, 
+             ~ downloadSubtitles(link = .x, file_name = .y))
+```
+
+
+
+```{r}
+subtitles_zip <- list.files(here::here("data/subtitles/"), 
+                            recursive = TRUE) %>% 
+  paste0(here::here("data/subtitles/"), .)
+
+fs::dir_create(here::here("data/extracted_subtitles"))
+
+extractSubtitles <- function(zip_link = zip_link, file_name = file_name) {
+  if(!file.exists(zip_link)) {
+    unzip(zipfile = subtitles_zip,
+          exdir = here::here(glue::glue("data/extracted_subtitles/{file_name}")),
+          overwrite = FALSE)
+    cat("Unzip ", file_name, " Done!\n")
+  }
+}
+
+purrr::walk2(subtitles_zip, links_all_clean$file_name, 
+             ~ extractSubtitles(zip_link = .x, file_name = .y))
+```
 
 
 
